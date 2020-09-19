@@ -10,6 +10,8 @@
 
 #include <spdlog/fmt/ostr.h>
 
+#include <entt/entt.hpp>
+
 #include <mz_vector.hpp>
 #include <mz_matrix.hpp>
 

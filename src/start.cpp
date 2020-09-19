@@ -3,6 +3,8 @@
 #include <iostream>
 #include <ostream>
 
+#include "start.h"
+
 #include "dependencies.h"
 
 #include "graphics/graphics_api.h"
@@ -12,7 +14,6 @@
 #include "image_import.h"
 
 #include "os.h"
-#include "..\include\start.h"
 
 void graphics_debug_callback(graphics_enum_t severity, const char* msg, const char* fn) {
     char output_msg[4096] = "";
@@ -33,9 +34,14 @@ bool g_running = true;
 
 Thread_Server g_thread_server;
 thread_id_t g_graphics_thread;
+entt::registry g_reg;
 
 void quit() {
     g_running = false;
+}
+
+entt::registry& get_entity_registry() {
+    return g_reg;
 }
 
 Thread_Server& get_thread_server() {
@@ -83,40 +89,62 @@ int AP_API start(int argc, char** argv) {
     typedef void (__cdecl *on_render_t)(Graphics_Context*); 
     typedef void (__cdecl *on_gui_t)(Graphics_Context*, ImGuiContext*); 
 
+    typedef void (__cdecl *init_t)(); 
+    typedef Component_Info* (__cdecl *get_component_info_t)(uintptr_t); 
+    typedef const Hash_Set<uintptr_t>& (__cdecl *get_component_ids_t)(); 
+    typedef void* (__cdecl *create_component_t)(uintptr_t, entt::registry&, entt::entity); 
+    typedef void (__cdecl *remove_component_t)(uintptr_t, entt::registry&, entt::entity); 
+    typedef uintptr_t (__cdecl *get_component_id_t)(const std::string&); 
+
     on_load_t on_load = NULL;
     on_unload_t on_unload = NULL;
     on_update_t on_update = NULL;
     on_render_t on_render = NULL;
     on_gui_t on_gui = NULL;
 
+    init_t init = NULL;
+    get_component_info_t get_component_info = NULL;
+    get_component_ids_t get_component_ids = NULL;
+    create_component_t create_component = NULL;
+    remove_component_t remove_component = NULL;
+    get_component_id_t get_component_id = NULL;
+
     auto err = Path::copy(mod_path_new, mod_path);
     ap_assert(err.value() == 0, "Copy fail: {}", err.message());
-    auto mod = os::load_module(mod_path);
-    if (mod) {
+    
+    
+    #define load_fn(n) n = (n##_t)os::load_module_function(mod, #n);\
+                        if (!n) { log_error("Failed loading " #n); n = NULL; }
 
-        on_load = (on_load_t)os::load_module_function(mod, "on_load");
-        on_unload = (on_unload_t)os::load_module_function(mod, "on_unload");
-        on_update = (on_update_t)os::load_module_function(mod, "on_update");
-        on_render = (on_render_t)os::load_module_function(mod, "on_render");
-        on_gui = (on_gui_t)os::load_module_function(mod, "on_gui");
+    void* mod = NULL;
 
-        if (!on_load) {
-            log_error("Failed loading on_load()");
+    auto load_modules = [&]() {
+        mod = os::load_module(mod_path);
+        if (mod) {
+            load_fn(on_load);
+            load_fn(on_unload);
+            load_fn(on_update);
+            load_fn(on_render);
+            load_fn(on_gui);
+
+            load_fn(init);
+            load_fn(get_component_info);
+            load_fn(get_component_ids);
+            load_fn(create_component);
+            load_fn(remove_component);
+            load_fn(get_component_id);
+
+            log_info("Loaded test_module");
+
+            if (on_load) on_load(g_graphics);
+            if (init) init();
+
         } else {
-            on_load(g_graphics);
+            log_error("Failed loading test_module");
         }
-        if (!on_update) {
-            log_error("Failed loading on_update()");
-        }
-        if (!on_render) {
-            log_error("Failed loading on_render()");
-        }
-        if (!on_gui) {
-            log_error("Failed loading on_gui()");
-        }
-    } else {
-        log_error("Failed loading test_module");
-    }
+    };
+
+    load_modules();
 
     while (g_running) {
         
@@ -144,44 +172,7 @@ int AP_API start(int argc, char** argv) {
             err = Path::copy(mod_path_new, mod_path);
             ap_assert(err.value() == 0, "Copy fail: {}", err.message());
 
-            mod = os::load_module(mod_path);
-            if (mod) {
-
-                on_load = (on_load_t)os::load_module_function(mod, "on_load");
-                on_unload = (on_unload_t)os::load_module_function(mod, "on_unload");
-                on_update = (on_update_t)os::load_module_function(mod, "on_update");
-                on_render = (on_render_t)os::load_module_function(mod, "on_render");
-                on_gui = (on_gui_t)os::load_module_function(mod, "on_gui");
-
-                if (!on_load) {
-                    log_error("Failed loading on_load()");
-                }
-                if (!on_unload) {
-                    log_error("Failed loading on_unload()");
-                }
-                if (!on_update) {
-                    log_error("Failed loading on_update()");
-                }
-                if (!on_render) {
-                    log_error("Failed loading on_render()");
-                }
-                if (!on_gui) {
-                    log_error("Failed loading on_gui()");
-                }
-
-                log_info("Loaded test module");
-
-                if (on_load) on_load(g_graphics);
-
-                //continue;
-            } else {
-                on_load = NULL;
-                on_unload = NULL;
-                on_update = NULL;
-                on_render = NULL;
-                on_gui = NULL;
-                log_error("Failed loading test_module");
-            }
+            load_modules();
         } 
 
         if (on_render) on_render(g_graphics);
@@ -190,6 +181,24 @@ int AP_API start(int argc, char** argv) {
             ImGui::UseGraphicsContext(g_graphics);
             g_thread_server.queue_task(g_graphics_thread, [&]() {
                 on_gui(g_graphics, ImGui::GetCurrentContext());    
+
+                ImGui::Begin("Components");
+
+                if (get_component_ids) {
+                    const auto& comp_ids = get_component_ids();
+                    for (auto& comp_id : comp_ids) {
+                        const auto& comp_info = get_component_info(comp_id);
+
+                        ImGui::Text("%s [%lu]", comp_info->name.c_str(), comp_info->runtime_id);
+                    }
+                }
+
+                if (ImGui::Button("Create Transform")) {
+                    auto& transform = *(mz::fmat4*)create_component(get_component_id("Transform"), g_reg, g_reg.create());
+                    transform.rows[3].x = 100;
+                }
+
+                ImGui::End();
             });
         }
 

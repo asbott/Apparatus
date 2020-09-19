@@ -94,7 +94,8 @@ workspace "Apparatus"
             "deps/mz",
             "deps/imgui",
             "deps/spdlog/include",
-            "deps/stb_image"
+            "deps/stb_image",
+            "deps/entt/single_include"
         }
 
         pchheader "pch.h"
@@ -155,6 +156,11 @@ workspace "Apparatus"
 
         files { "test_module/**.cpp", "test_module/**.h" }
 
+        prebuildcommands {
+            "start /wait %{wks.location}lib\\parser\\parser.exe \"%{wks.location}\\%{prj.name}\\_generated.cpp\" \"%{prj.location}\"",
+            "echo AP parser finished with exit code %ERRORLEVEL%"
+        }
+
         postbuildcommands {
             "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\Launcher\\%{prj.name}.dll",
             "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\runtime\\%{prj.name}.dll"
@@ -171,7 +177,8 @@ workspace "Apparatus"
             "deps/mz",
             "deps/imgui",
             "deps/spdlog/include",
-            "deps/stb_image"
+            "deps/stb_image",
+            "deps/entt/single_include"
         }
 
         links {
@@ -220,7 +227,8 @@ workspace "Apparatus"
             "deps/mz",
             "deps/imgui",
             "deps/spdlog/include",
-            "deps/stb_image"
+            "deps/stb_image",
+            "deps/entt/single_include"
         }
 
         filter "system:windows"
@@ -229,6 +237,16 @@ workspace "Apparatus"
         filter "system:linux"
             pic "On"
             defines { "_OS_LINUX" }
+
+    project "parser"
+        kind "ConsoleApp"
+        language   "C++"
+        warnings   "Extra"
+        cppdialect "C++17"
+        targetdir  ("lib/%{prj.name}")
+        objdir     ("lib/%{prj.name}-int")
+        files { "parser/**.cpp", "parser/**.h" }
+        location "parser"
 
     project "glfw"
         toolset    "gcc"
