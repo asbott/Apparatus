@@ -2,6 +2,21 @@
 
 #include "thread_server.h"
 
+#include <imgui.h>
+
+struct Property_Info {
+	std::function<void(void*, ImGuiContext* ctx)> on_gui;
+
+	std::string name;
+	size_t size;
+	size_t offset;
+};
+
+struct Entity_Info {
+	entt::entity id;
+	str_t<128> name;
+};
+
 struct Component_Info {
 	std::function<void*(entt::registry& reg, entt::entity entity)> create;
 	std::function<void*(entt::registry& reg, entt::entity entity)> get;
@@ -9,6 +24,8 @@ struct Component_Info {
 
 	std::string name;
 	uintptr_t runtime_id;
+
+	std::vector<Property_Info> properties;
 };
 
 struct Graphics_Context;

@@ -1,22 +1,24 @@
 #pragma once
 
-// #component
+#define tag(...)
+
+tag(component, nut)
 struct Transform {
-	// #serializable
-	// the transform matrix 
-	mz::fmat4 value;
+	tag(property)
+	fvec3 position;
+	tag(property)
+	fvec2 scale;
+	tag(property)
+	fvec4 color;
 };
 
-/*
-
-	#component
-
-*/
+tag(component)
 struct SpriteComponent {
 	float size;
 };
 
-// #component
-struct AnotherComponent {
-	float data;
+tag(component)
+struct SpeedComponent {
+	tag(property)
+	float speed;
 };

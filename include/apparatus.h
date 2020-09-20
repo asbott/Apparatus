@@ -12,3 +12,5 @@
 #include "thread_server.h"
 
 #include "image_import.h"
+
+using namespace mz;

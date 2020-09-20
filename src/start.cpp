@@ -93,6 +93,7 @@ int AP_API start(int argc, char** argv) {
     typedef Component_Info* (__cdecl *get_component_info_t)(uintptr_t); 
     typedef const Hash_Set<uintptr_t>& (__cdecl *get_component_ids_t)(); 
     typedef void* (__cdecl *create_component_t)(uintptr_t, entt::registry&, entt::entity); 
+    typedef void* (__cdecl *get_component_t)(uintptr_t, entt::registry&, entt::entity); 
     typedef void (__cdecl *remove_component_t)(uintptr_t, entt::registry&, entt::entity); 
     typedef uintptr_t (__cdecl *get_component_id_t)(const std::string&); 
 
@@ -106,6 +107,7 @@ int AP_API start(int argc, char** argv) {
     get_component_info_t get_component_info = NULL;
     get_component_ids_t get_component_ids = NULL;
     create_component_t create_component = NULL;
+    get_component_t get_component = NULL;
     remove_component_t remove_component = NULL;
     get_component_id_t get_component_id = NULL;
 
@@ -131,6 +133,7 @@ int AP_API start(int argc, char** argv) {
             load_fn(get_component_info);
             load_fn(get_component_ids);
             load_fn(create_component);
+            load_fn(get_component);
             load_fn(remove_component);
             load_fn(get_component_id);
 
@@ -182,20 +185,78 @@ int AP_API start(int argc, char** argv) {
             g_thread_server.queue_task(g_graphics_thread, [&]() {
                 on_gui(g_graphics, ImGui::GetCurrentContext());    
 
-                ImGui::Begin("Components");
+                ImGui::Begin("Scene Inspector", NULL, ImGuiWindowFlags_MenuBar);
 
-                if (get_component_ids) {
-                    const auto& comp_ids = get_component_ids();
-                    for (auto& comp_id : comp_ids) {
-                        const auto& comp_info = get_component_info(comp_id);
+                ImGui::BeginMenuBar();
+                if (ImGui::BeginMenu("Create")) {
 
-                        ImGui::Text("%s [%lu]", comp_info->name.c_str(), comp_info->runtime_id);
+                    static str_t<128> buf;
+                    ImGui::InputText("Name", buf, sizeof(buf));
+
+                    if (ImGui::Button("Create")) {
+                        auto entity = g_reg.create();
+                        g_reg.emplace<Entity_Info>(entity);
+                        g_reg.get<Entity_Info>(entity).id = entity;
+                        strcpy(g_reg.get<Entity_Info>(entity).name, buf);
+                        strcpy(buf, "");
                     }
-                }
 
-                if (ImGui::Button("Create Transform")) {
-                    auto& transform = *(mz::fmat4*)create_component(get_component_id("Transform"), g_reg, g_reg.create());
-                    transform.rows[3].x = 100;
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenuBar();
+
+                static entt::entity selected_entity = entt::null;
+
+                g_reg.view<Entity_Info>().each([&](entt::entity entity, Entity_Info& entity_info) {
+                    char label[256] = "";
+                    sprintf(label, "%s##%i", entity_info.name, entity_info.id);
+                    
+                    ImGuiTreeNodeFlags flags = 0;
+                    flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+                    if (entity == selected_entity) flags |= ImGuiTreeNodeFlags_Selected;
+                    bool entity_opened = ImGui::TreeNodeEx(label, flags);
+                    if (ImGui::IsItemClicked()) {
+                        selected_entity = entity;
+                    }
+                    if (entity_opened) {
+                        ImGui::TreePop();
+                    }
+                });
+
+                ImGui::End();
+
+                ImGui::Begin("Entity Inspector");
+                if (selected_entity != entt::null) {
+                    const auto& ids = get_component_ids();
+                    for (auto id : ids) {
+                        if (void* comp = get_component(id, g_reg, selected_entity)) {
+                            const auto& info = get_component_info(id);
+                            bool component_opened = ImGui::TreeNodeEx(info->name.c_str(), ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DefaultOpen);
+
+                            if (component_opened) {
+                                for (const auto& prop : info->properties) {
+                                    prop.on_gui((byte*)comp + prop.offset, ImGui::GetCurrentContext());
+                                }
+
+                                ImGui::TreePop();
+                            }
+                        }
+                    }
+
+                    if (ImGui::BeginMenu("Add Component")) {
+
+                        for (auto id : ids) {
+                            const auto& info = get_component_info(id);
+
+                            if (ImGui::MenuItem(info->name.c_str())) {
+                                create_component(id, g_reg, selected_entity);
+                            }
+                        }
+
+                        ImGui::EndMenu();
+                    }
+                } else {
+                    ImGui::Text("No entity selected");
                 }
 
                 ImGui::End();

@@ -5,79 +5,359 @@
 #include <set>
 #include <string>
 
-bool read_as_string(const char* path, char* out_buffer, size_t buffer_size) {
-    FILE* file_handle = fopen(path, "r");
+#include "io.h"
 
-    if (!file_handle) return false;
 
-    fgets(out_buffer, (int)buffer_size, file_handle);
+#include <string>
 
-    fclose(file_handle);
+class Token {
+public:
+    enum class Kind {
+        Number,
+        Identifier,
+        LeftParen,
+        RightParen,
+        LeftSquare,
+        RightSquare,
+        LeftCurly,
+        RightCurly,
+        LessThan,
+        GreaterThan,
+        Equal,
+        Plus,
+        Minus,
+        Asterisk,
+        Slash,
+        Hash,
+        Dot,
+        Comma,
+        Colon,
+        Semicolon,
+        SingleQuote,
+        DoubleQuote,
+        Comment,
+        Pipe,
+        End,
+        Unexpected,
+    };
 
-    return true;
-}
+    Token(Kind kind) noexcept : m_kind{kind} {}
 
-std::string read_file(const std::string& path) {
-    char* buf = new char[1024 * 1000 * 2];
-    read_as_string(path.c_str(), buf, 1024 * 1000 * 2);
+    Token(Kind kind, const char* beg, std::size_t len) noexcept
+        : m_kind{kind}, m_lexeme(beg, len) {}
 
-    std::string result = buf;
-    delete buf;
-    return result;
-}
+    Token(Kind kind, const char* beg, const char* end) noexcept
+        : m_kind{kind}, m_lexeme(beg, std::distance(beg, end)) {}
 
-inline std::ostream& blue(std::ostream &s)
-{
-    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
-    SetConsoleTextAttribute(hStdout, FOREGROUND_BLUE
-        |FOREGROUND_GREEN|FOREGROUND_INTENSITY);
-    return s;
-}
+    Kind kind() const noexcept { return m_kind; }
 
-inline std::ostream& red(std::ostream &s)
-{
-    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
-    SetConsoleTextAttribute(hStdout, 
-        FOREGROUND_RED|FOREGROUND_INTENSITY);
-    return s;
-}
+    void kind(Kind kind) noexcept { m_kind = kind; }
 
-inline std::ostream& green(std::ostream &s)
-{
-    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
-    SetConsoleTextAttribute(hStdout, 
-        FOREGROUND_GREEN|FOREGROUND_INTENSITY);
-    return s;
-}
+    bool is(Kind kind) const noexcept { return m_kind == kind; }
 
-inline std::ostream& yellow(std::ostream &s)
-{
-    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
-    SetConsoleTextAttribute(hStdout, 
-        FOREGROUND_GREEN|FOREGROUND_RED|FOREGROUND_INTENSITY);
-    return s;
-}
+    bool is_not(Kind kind) const noexcept { return m_kind != kind; }
 
-inline std::ostream& white(std::ostream &s)
-{
-    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
-    SetConsoleTextAttribute(hStdout, 
-        FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_BLUE);
-    return s;
-}
+    bool is_one_of(Kind k1, Kind k2) const noexcept { return is(k1) || is(k2); }
 
-struct color {
-    color(WORD attribute):m_color(attribute){};
-    WORD m_color;
+    template <typename... Ts>
+    bool is_one_of(Kind k1, Kind k2, Ts... ks) const noexcept {
+        return is(k1) || is_one_of(k2, ks...);
+    }
+
+    std::string_view lexeme() const noexcept { return m_lexeme; }
+
+    void lexeme(std::string_view lexeme) noexcept {
+        m_lexeme = std::move(lexeme);
+    }
+
+private:
+    Kind             m_kind{};
+    std::string_view m_lexeme{};
 };
 
-template <class _Elem, class _Traits>
-std::basic_ostream<_Elem,_Traits>& 
-operator<<(std::basic_ostream<_Elem,_Traits>& i, color& c)
-{
-    HANDLE hStdout=GetStdHandle(STD_OUTPUT_HANDLE); 
-    SetConsoleTextAttribute(hStdout,c.m_color);
-    return i;
+class Lexer {
+public:
+    Lexer(const char* beg) noexcept : m_beg{beg} {}
+
+    Token next() noexcept;
+
+private:
+    Token identifier() noexcept;
+    Token number() noexcept;
+    Token slash_or_comment() noexcept;
+    Token atom(Token::Kind) noexcept;
+
+    char peek() const noexcept { return *m_beg; }
+    char get() noexcept { return *m_beg++; }
+
+    const char* m_beg = nullptr;
+};
+
+bool is_space(char c) noexcept {
+    switch (c) {
+    case ' ':
+    case '\t':
+    case '\r':
+    case '\n':
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_digit(char c) noexcept {
+    switch (c) {
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_identifier_char(char c) noexcept {
+    switch (c) {
+    case 'a':
+    case 'b':
+    case 'c':
+    case 'd':
+    case 'e':
+    case 'f':
+    case 'g':
+    case 'h':
+    case 'i':
+    case 'j':
+    case 'k':
+    case 'l':
+    case 'm':
+    case 'n':
+    case 'o':
+    case 'p':
+    case 'q':
+    case 'r':
+    case 's':
+    case 't':
+    case 'u':
+    case 'v':
+    case 'w':
+    case 'x':
+    case 'y':
+    case 'z':
+    case 'A':
+    case 'B':
+    case 'C':
+    case 'D':
+    case 'E':
+    case 'F':
+    case 'G':
+    case 'H':
+    case 'I':
+    case 'J':
+    case 'K':
+    case 'L':
+    case 'M':
+    case 'N':
+    case 'O':
+    case 'P':
+    case 'Q':
+    case 'R':
+    case 'S':
+    case 'T':
+    case 'U':
+    case 'V':
+    case 'W':
+    case 'X':
+    case 'Y':
+    case 'Z':
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+    case '_':
+        return true;
+    default:
+        return false;
+    }
+}
+
+Token Lexer::atom(Token::Kind kind) noexcept { return Token(kind, m_beg++, 1); }
+
+Token Lexer::next() noexcept {
+    while (is_space(peek())) get();
+
+    switch (peek()) {
+    case '\0':
+        return Token(Token::Kind::End, m_beg, 1);
+    default:
+        return atom(Token::Kind::Unexpected);
+    case 'a':
+    case 'b':
+    case 'c':
+    case 'd':
+    case 'e':
+    case 'f':
+    case 'g':
+    case 'h':
+    case 'i':
+    case 'j':
+    case 'k':
+    case 'l':
+    case 'm':
+    case 'n':
+    case 'o':
+    case 'p':
+    case 'q':
+    case 'r':
+    case 's':
+    case 't':
+    case 'u':
+    case 'v':
+    case 'w':
+    case 'x':
+    case 'y':
+    case 'z':
+    case 'A':
+    case 'B':
+    case 'C':
+    case 'D':
+    case 'E':
+    case 'F':
+    case 'G':
+    case 'H':
+    case 'I':
+    case 'J':
+    case 'K':
+    case 'L':
+    case 'M':
+    case 'N':
+    case 'O':
+    case 'P':
+    case 'Q':
+    case 'R':
+    case 'S':
+    case 'T':
+    case 'U':
+    case 'V':
+    case 'W':
+    case 'X':
+    case 'Y':
+    case 'Z':
+        return identifier();
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+        return number();
+    case '(':
+        return atom(Token::Kind::LeftParen);
+    case ')':
+        return atom(Token::Kind::RightParen);
+    case '[':
+        return atom(Token::Kind::LeftSquare);
+    case ']':
+        return atom(Token::Kind::RightSquare);
+    case '{':
+        return atom(Token::Kind::LeftCurly);
+    case '}':
+        return atom(Token::Kind::RightCurly);
+    case '<':
+        return atom(Token::Kind::LessThan);
+    case '>':
+        return atom(Token::Kind::GreaterThan);
+    case '=':
+        return atom(Token::Kind::Equal);
+    case '+':
+        return atom(Token::Kind::Plus);
+    case '-':
+        return atom(Token::Kind::Minus);
+    case '*':
+        return atom(Token::Kind::Asterisk);
+    case '/':
+        return slash_or_comment();
+    case '#':
+        return atom(Token::Kind::Hash);
+    case '.':
+        return atom(Token::Kind::Dot);
+    case ',':
+        return atom(Token::Kind::Comma);
+    case ':':
+        return atom(Token::Kind::Colon);
+    case ';':
+        return atom(Token::Kind::Semicolon);
+    case '\'':
+        return atom(Token::Kind::SingleQuote);
+    case '"':
+        return atom(Token::Kind::DoubleQuote);
+    case '|':
+        return atom(Token::Kind::Pipe);
+    }
+}
+
+Token Lexer::identifier() noexcept {
+    const char* start = m_beg;
+    get();
+    while (is_identifier_char(peek())) get();
+    return Token(Token::Kind::Identifier, start, m_beg);
+}
+
+Token Lexer::number() noexcept {
+    const char* start = m_beg;
+    get();
+    while (is_digit(peek())) get();
+    return Token(Token::Kind::Number, start, m_beg);
+}
+
+Token Lexer::slash_or_comment() noexcept {
+    const char* start = m_beg;
+    get();
+    if (peek() == '/') {
+        get();
+        start = m_beg;
+        while (peek() != '\0') {
+            if (get() == '\n') {
+                return Token(Token::Kind::Comment, start,
+                    std::distance(start, m_beg) - 1);
+            }
+        }
+        return Token(Token::Kind::Unexpected, m_beg, 1);
+    } else {
+        return Token(Token::Kind::Slash, start, 1);
+    }
+}
+
+#include <iomanip>
+#include <iostream>
+
+std::ostream& operator<<(std::ostream& os, const Token::Kind& kind) {
+    static const char* const names[]{
+        "Number",      "Identifier",  "LeftParen",  "RightParen", "LeftSquare",
+        "RightSquare", "LeftCurly",   "RightCurly", "LessThan",   "GreaterThan",
+        "Equal",       "Plus",        "Minus",      "Asterisk",   "Slash",
+        "Hash",        "Dot",         "Comma",      "Colon",      "Semicolon",
+        "SingleQuote", "DoubleQuote", "Comment",    "Pipe",       "End",
+        "Unexpected",
+    };
+    return os << names[static_cast<int>(kind)];
 }
 
 namespace fs = std::filesystem;
@@ -100,13 +380,14 @@ void done(int code) {
 }
 
 int main(int argc, char** argv) {
+    (void)argc;
 	system("@echo on");
 	
 	std::cout << "====================================================================================\n";
 	std::cout << "Running AP parser\n\n";
 
-    output_file = argv[1];
-    target_directory = argv[2];
+    output_file = "D:\\dev\\Apparatus\\test_module\\_generated.cpp";//argv[1];
+    target_directory = "D:\\dev\\Apparatus\\test_module";//argv[2];
     if (target_directory[target_directory.length() - 1] == '"') target_directory.pop_back();
 	
     std::cout << output_file << "\n";
@@ -130,8 +411,12 @@ int main(int argc, char** argv) {
 
     output_stream << "#include \"apparatus.h\"\n";
 
-    std::set<std::string> all_tags = {
-        "#component", "#serializable"
+    std::set<std::string> all_types = {
+        "s32", "u32", "s64", "u64", "int",
+        "float", "f32", "double", "f64",
+        "bool",
+        "mz::ivec2", "mz::ivec3", "mz::ivec4",
+        "mz::fvec2", "mz::fvec3", "mz::fvec4"
     };
 
     std::set<std::string> files;
@@ -146,7 +431,7 @@ int main(int argc, char** argv) {
             std::string word;
             while (file_stream >> word) {
                 std::cout << word << "\n";
-                if (word[0] == '#' && all_tags.find(word) != all_tags.end()) {
+                if (word.find("tag") == 0) {
                     files.emplace(file_path);
                     std::cout << file_path << "\n";
                     output_stream << "#include \"" << file_path << "\"\n";
@@ -165,6 +450,35 @@ int main(int argc, char** argv) {
 Hash_Set<uintptr_t> runtime_ids;
 Hash_Map<std::string, uintptr_t> name_id_map;
 Hash_Map<uintptr_t, Component_Info> component_info;
+
+template <typename type_t>
+void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
+    ImGui::SetCurrentContext(ctx);
+
+    std::string label = name + "##" + std::to_string((uintptr_t)data);
+
+    if constexpr (std::is_same<type_t, bool>()) {
+        ImGui::Checkbox(label.c_str(), data);
+    } else if constexpr (std::is_integral<type_t>()) {
+        ImGui::InputInt(label.c_str(), data);
+    } else if constexpr (std::is_same<type_t, mz::ivec2>()) {
+        ImGui::InputInt2(label.c_str(), data);
+    } else if constexpr (std::is_same<type_t, mz::ivec3>()) {
+        ImGui::InputInt3(label.c_str(), data);
+    } else if constexpr (std::is_same<type_t, mz::ivec4>()) {
+        ImGui::InputInt4(label.c_str(), data);
+    } else if constexpr (std::is_same<type_t, f32>()) {
+        ImGui::InputFloat(label.c_str(), data, 0.1f, 0.2f, 5);
+    } else if constexpr (std::is_same<type_t, mz::fvec2>()) {
+        ImGui::InputFloat2(label.c_str(), (f32*)data, 5);
+    } else if constexpr (std::is_same<type_t, mz::fvec3>()) {
+        ImGui::InputFloat3(label.c_str(), (f32*)data, 5);
+    } else if constexpr (std::is_same<type_t, mz::fvec4>()) {
+        ImGui::InputFloat4(label.c_str(), (f32*)data, 5);
+    } else {
+        ImGui::Text("%s N/A", label.c_str());
+    }
+}
 
 extern "C" {
 
@@ -187,6 +501,10 @@ extern "C" {
 		return component_info[runtime_id].create(reg, entity);
 	}
 
+    __declspec(dllexport) void* __cdecl get_component(uintptr_t runtime_id, entt::registry& reg, entt::entity entity) {
+        return component_info[runtime_id].get(reg, entity);
+    }
+
     __declspec(dllexport) void __cdecl remove_component(uintptr_t runtime_id, entt::registry& reg, entt::entity entity) {
 		component_info[runtime_id].remove(reg, entity);
 	}
@@ -201,89 +519,153 @@ extern "C" {
 
 
     output_stream << upper_code;
-    
-    enum Item_Type {
-        item_type_struct, item_type_global_function, item_type_global_variable, 
-        item_type_member_function, item_type_member_variable
-    };
 
-    struct Tagged_Item {
-        std::set<std::string> tags;
-        Item_Type type;
+    struct Field_Item {
         std::string name;
+        std::string property_type;
+        std::set<std::string> tags;
     };
 
-    Tagged_Item current_item;
+    struct Struct_Item {
+        std::set<std::string> tags;
+        std::string name;
+        std::vector<Field_Item> members;
+    };
 
-    std::vector<Tagged_Item> items;
+    /*Tagged_Item current_item;
+    Tagged_Item* current_parent = NULL;*/
+
+    std::vector<Struct_Item> structs;
+    std::vector<Token> previous_tokens;
+    bool first_tag_found = false;
+    std::set<std::string> tags;
 
     for (auto& file_path : files) {
-        std::ifstream input_stream;
-        input_stream.open(file_path);
+        auto src = read_file(file_path);
+        Lexer lex(src.c_str());
+
         
-        std::string word;
-        while (input_stream >> word) {
-            auto it = all_tags.find(word);
-            if (it != all_tags.end()) {
-                std::string tag = *it;
-                current_item.tags.emplace(tag);
+        #define is_end(t) t.is_one_of(Token::Kind::End, Token::Kind::Unexpected)
+        for (auto token = lex.next(); !is_end(token); token = lex.next()) {
+            if (token.is(Token::Kind::Identifier) && token.lexeme() == "tag" && first_tag_found) {
+                auto next = lex.next();
+                if (!next.is(Token::Kind::LeftParen)) {
+                    std::cout << red << "Expected '(' for tag list open\n" << white;
+                    done(-1);
+                }
+                next = lex.next();
+                while (!is_end(next) && next.is_not(Token::Kind::RightParen)) {
+                    if (!next.is_one_of(Token::Kind::Comma, Token::Kind::Identifier)) {
+                        std::cout << red << "Unexpected token in tags list" << white;
+                        done(-1);
+                    }
+                    if (next.is(Token::Kind::Identifier)) {
+                        tags.emplace(next.lexeme());
+                    }
+                    next = lex.next();
+                }
+                token = next;
             }
 
-            if (word == "struct") {
-                current_item.type = item_type_struct;
-                input_stream >> current_item.name;
+            if (token.lexeme() == "tag") first_tag_found = true;
 
-                items.push_back(current_item);
-                current_item = Tagged_Item();
+            if (token.is(Token::Kind::Identifier) && token.lexeme() == "struct") {
+                Struct_Item item;
+                item.tags = tags;
+                
+                Token next = lex.next();
+                while (next.is_not(Token::Kind::LeftCurly)) {
+                    token = next;
+                    next = lex.next();
+                }
+
+                item.name = token.lexeme();
+
+                tags.clear();
+
+                structs.push_back(item);
             }
-        }
 
-        input_stream.close();
-    }
+            if (token.is_one_of(Token::Kind::Semicolon, Token::Kind::Equal) && previous_tokens.size() >= 2) {
+                auto first = previous_tokens[previous_tokens.size()-2];
+                auto second = previous_tokens[previous_tokens.size()-1];
+                auto third = token;
 
-    for (auto& item : items) {
-        output_stream << "        {\n";
-        switch (item.type) {
-        case item_type_struct:
-            for (auto& tag : item.tags) {
-                if (tag == "#component") {
-                    output_stream << "            uintptr_t id = (uintptr_t)typeid(" << item.name << ").name();\n";
-                    output_stream << "            runtime_ids.emplace(id);\n";
-                    output_stream << "            name_id_map[\"" << item.name << "\"] = id;\n";
-                    output_stream << "            component_info[id] = {\n";
-                    output_stream << "                [](entt::registry& reg, entt::entity entity) { \n";
-                    output_stream << "                    return &reg.emplace<" << item.name << ">(entity);\n";
-                    output_stream << "                },\n";
-                    output_stream << "                [](entt::registry& reg, entt::entity entity) { \n";
-                    output_stream << "                    return &reg.get<" << item.name << ">(entity);\n";
-                    output_stream << "                }, \n";
-                    output_stream << "                [](entt::registry& reg, entt::entity entity) { \n";
-                    output_stream << "                    reg.remove<" << item.name << ">(entity);\n";
-                    output_stream << "                },\n";
-                    output_stream << "            \n";
-                    output_stream << "                \"" << item.name << "\",\n";
-                    output_stream << "                id\n";
-                    output_stream << "            };\n";
+                if (first.is(Token::Kind::Identifier) 
+                    && second.is(Token::Kind::Identifier) 
+                    && third.is_one_of(Token::Kind::Semicolon, Token::Kind::Equal)
+                    && structs.size() > 0) {
+
+                    auto& struct_item = structs[structs.size() - 1];
+
+                    Field_Item item;
+                    item.property_type = first.lexeme();
+                    item.name = second.lexeme();
+                    item.tags = tags;
+                    tags.clear();
+
+                    struct_item.members.push_back(item);
                 }
             }
-            break;
-        default:
-            break;
+
+            previous_tokens.push_back(token);
         }
-        output_stream << "        }\n";
+    }
+
+    for (auto& struct_item : structs) {
+        for (auto& tag : struct_item.tags) {
+            if (tag == "component") {
+                output_stream << "        {\n";
+                output_stream << "            uintptr_t id = (uintptr_t)typeid(" << struct_item.name << ").name();\n";
+                output_stream << "            runtime_ids.emplace(id);\n";
+                output_stream << "            name_id_map[\"" << struct_item.name << "\"] = id;\n";
+                output_stream << "            component_info[id] = {\n";
+                output_stream << "                [](entt::registry& reg, entt::entity entity) { \n";
+                output_stream << "                    return &reg.emplace<" << struct_item.name << ">(entity);\n";
+                output_stream << "                },\n";
+                output_stream << "                [](entt::registry& reg, entt::entity entity) { \n";
+                output_stream << "                    if (!reg.has<" << struct_item.name << ">(entity)) return (void*)NULL;\n";
+                output_stream << "                    return (void*)&reg.get<" << struct_item.name << ">(entity);\n";
+                output_stream << "                }, \n";
+                output_stream << "                [](entt::registry& reg, entt::entity entity) { \n";
+                output_stream << "                    reg.remove<" << struct_item.name << ">(entity);\n";
+                output_stream << "                },\n";
+                output_stream << "            \n";
+                output_stream << "                \"" << struct_item.name << "\",\n";
+                output_stream << "                id,\n";
+
+                output_stream << "                std::vector<Property_Info> {\n";
+                std::vector<std::string> sizeofs;
+                for (auto& member : struct_item.members) {
+                    for (auto& tag : member.tags) {
+                        if (tag == "property") {
+                            std::string this_sizeof = "sizeof(" + member.property_type + ")";
+                            std::string this_offset = "";
+                            for (auto& asizeof : sizeofs) this_offset += asizeof+ + "+";
+                            if (this_offset.size() > 1) this_offset.pop_back();
+                            if (this_offset == "") this_offset = "0";
+                            output_stream << "                    Property_Info { \n";
+                            output_stream << "                        [](void* data, ImGuiContext* ctx) {\n";
+                            output_stream << "                            do_gui<" << member.property_type << ">(\"" << member.name << "\", (" << member.property_type << "*)data, ctx);\n";
+                            output_stream << "                        },\n";
+                            output_stream << "                        \"" << member.name << "\",\n";
+                            output_stream << "                        " << this_sizeof << ",\n";
+                            output_stream << "                        " << this_offset << ",\n";
+                            output_stream << "                    },\n";
+
+                            sizeofs.push_back(this_sizeof);
+                        }
+                    }
+                }
+                output_stream << "                }\n";
+                output_stream << "            };\n";
+                output_stream << "        }\n";
+            }
+        }
+        
     }
 
     output_stream << lower_code;
 
 	done(0);
 }
-
-/*
-start /wait parser.exe
-if %ERRORLEVEL% EQU 0 (
-echo success
-) else (
-echo fail
-)
-*/
-

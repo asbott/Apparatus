@@ -425,7 +425,8 @@ extern "C" {
 		(void)delta;
 
 		get_entity_registry().view<Transform>().each([](Transform& transform) {
-			log_trace(transform.value.rows[3]);
+			log_trace("Position: {}\n Scale: {}\nColor: {}", 
+				       transform.position, transform.scale, transform.color);
 		});
     }
 
