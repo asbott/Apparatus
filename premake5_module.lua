@@ -20,7 +20,7 @@ prebuildcommands {
 }
 
 postbuildcommands {
-    "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\Launcher\\%{prj.name}.dll",
+    "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\launcher\\%{prj.name}.dll",
     "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\runtime\\%{prj.name}.dll"
 }
 
@@ -29,7 +29,7 @@ disablewarnings {
 }
 
 includedirs {
-    "include/",
+    "core/apparatus/include/",
     "deps/glad/include",
     "deps/glfw/include",
     "deps/mz",
@@ -44,7 +44,7 @@ includedirs {
 }
 
 links {
-    "Apparatus",
+    "apparatus",
     "imgui"
 }
 

@@ -8,11 +8,11 @@ function make_module(name)
     io.writefile("modules/" .. name .. "/_generated.cpp", "")
 end
 
-workspace "Apparatus"
+workspace "apparatus"
     architecture "x64"
     systemversion "latest"
 
-    startproject "Launcher"
+    startproject "launcher"
 
 
     filter "system:windows"
@@ -65,7 +65,7 @@ workspace "Apparatus"
     filter { "system:linux", "configurations:Debug or Release or Test" }
         defines { "AP_SUPPORT_OPENGL45" }
 
-    project "Apparatus"
+    project "apparatus"
         kind "SharedLib"
         language   "C++"
         warnings   "Extra"
@@ -73,6 +73,7 @@ workspace "Apparatus"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
         vectorextensions "SSE4.1"
+        location "core/apparatus"
 
 
         flags {
@@ -91,10 +92,10 @@ workspace "Apparatus"
             "glad",
         }
 
-        files { "src/**.cpp", "include/**.h", "assets/**.hlsl" }
+        files { "%{prj.location}/src/**.cpp", "%{prj.location}/include/**.h" }
 
         includedirs {
-            "include/",
+            "%{prj.location}/include/",
             "deps/glad/include",
             "deps/glfw/include",
             "deps/mz",
@@ -105,7 +106,7 @@ workspace "Apparatus"
         }
 
         pchheader "pch.h"
-        pchsource "src/pch.cpp"
+        pchsource "%{prj.location}/src/pch.cpp"
 
         disablewarnings {
             "4324"
@@ -113,7 +114,7 @@ workspace "Apparatus"
 
         postbuildcommands {
             "if not exist %{wks.location}lib\\runtime\\ mkdir %{wks.location}lib\\runtime\\",
-            "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\Launcher\\%{prj.name}.dll",
+            "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\launcher\\%{prj.name}.dll",
             "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\runtime\\%{prj.name}.dll"
         }
 
@@ -152,7 +153,7 @@ workspace "Apparatus"
 
     make_module "asset_manager"
 
-    project "Launcher"
+    project "launcher"
         kind "ConsoleApp"
         language   "C++"
         warnings   "Extra"
@@ -160,7 +161,7 @@ workspace "Apparatus"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
         vectorextensions "SSE4.1"
-        location "Launcher"
+        location "core/launcher"
 
 
         flags {
@@ -174,13 +175,13 @@ workspace "Apparatus"
         }
         links {
             "test_module",
-            "Apparatus"
+            "apparatus"
         }
 
-        files { "Launcher/**.cpp", "Launcher/**.h" }
+        files { "%{prj.location}/**.cpp", "%{prj.location}/**.h" }
 
         includedirs {
-            "include/",
+            "core/apparatus/include/",
             "deps/glad/include",
             "deps/glfw/include",
             "deps/mz",
@@ -204,8 +205,8 @@ workspace "Apparatus"
         cppdialect "C++17"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
-        files { "parser/**.cpp", "parser/**.h" }
-        location "parser"
+        files { "%{prj.location}/**.cpp", "%{prj.location}/**.h" }
+        location "core/parser"
 
     project "glfw"
         toolset    "gcc"
