@@ -1,6 +1,12 @@
 
-bin_dir = "%{wks.location}/bin/"
-int_dir = "%{wks.location}/bin-int/"
+
+
+function make_module(name)
+    project(name)
+        dofile "premake5_module.lua"
+
+    io.writefile("modules/" .. name .. "/_generated.cpp", "")
+end
 
 workspace "Apparatus"
     architecture "x64"
@@ -139,59 +145,12 @@ workspace "Apparatus"
                 "stdc++fs",
             }
 
-    project "test_module"
-        kind "SharedLib"
-        language   "C++"
-        warnings   "Extra"
-        cppdialect "C++17"
-        targetdir  ("lib/%{prj.name}")
-        objdir     ("lib/%{prj.name}-int")
-        vectorextensions "SSE4.1"
-        location "test_module"
+    
+    make_module "test_module"
 
-        flags {
-            "FatalWarnings",
-            "MultiProcessorCompile"
-        }
+    make_module "ecs_2d_renderer"
 
-        files { "test_module/**.cpp", "test_module/**.h" }
-
-        prebuildcommands {
-            "start /wait %{wks.location}lib\\parser\\parser.exe \"%{wks.location}\\%{prj.name}\\_generated.cpp\" \"%{prj.location}\"",
-            "echo AP parser finished with exit code %ERRORLEVEL%"
-        }
-
-        postbuildcommands {
-            "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\Launcher\\%{prj.name}.dll",
-            "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\runtime\\%{prj.name}.dll"
-        }
-
-        disablewarnings {
-            "4324"
-        }
-
-        includedirs {
-            "include/",
-            "deps/glad/include",
-            "deps/glfw/include",
-            "deps/mz",
-            "deps/imgui",
-            "deps/spdlog/include",
-            "deps/stb_image",
-            "deps/entt/single_include"
-        }
-
-        links {
-            "Apparatus",
-            "imgui"
-        }
-
-        filter "system:windows"
-            defines { "_OS_WINDOWS" }
-
-        filter "system:linux"
-            pic "On"
-            defines { "_OS_LINUX" }
+    make_module "asset_manager"
 
     project "Launcher"
         kind "ConsoleApp"
@@ -348,7 +307,8 @@ workspace "Apparatus"
             "deps/imgui/imgui_demo.cpp",
             "deps/imgui/examples/imgui_impl_opengl3.cpp",
             "deps/imgui/examples/imgui_impl_glfw.cpp",
-            "deps/imgui/examples/imgui_impl_dx11.cpp"
+            "deps/imgui/examples/imgui_impl_dx11.cpp",
+            "deps/imgui/misc/cpp/imgui_stdlib.cpp"
         }
         
         includedirs 

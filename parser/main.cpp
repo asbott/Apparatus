@@ -386,8 +386,8 @@ int main(int argc, char** argv) {
 	std::cout << "====================================================================================\n";
 	std::cout << "Running AP parser\n\n";
 
-    output_file = "D:\\dev\\Apparatus\\test_module\\_generated.cpp";//argv[1];
-    target_directory = "D:\\dev\\Apparatus\\test_module";//argv[2];
+    output_file = argv[1];
+    target_directory = argv[2];
     if (target_directory[target_directory.length() - 1] == '"') target_directory.pop_back();
 	
     std::cout << output_file << "\n";
@@ -447,6 +447,8 @@ int main(int argc, char** argv) {
 #include <vector>
 #include <functional>
 
+#include <misc/cpp/imgui_stdlib.h>
+
 Hash_Set<uintptr_t> runtime_ids;
 Hash_Map<std::string, uintptr_t> name_id_map;
 Hash_Map<uintptr_t, Component_Info> component_info;
@@ -460,13 +462,13 @@ void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
     if constexpr (std::is_same<type_t, bool>()) {
         ImGui::Checkbox(label.c_str(), data);
     } else if constexpr (std::is_integral<type_t>()) {
-        ImGui::InputInt(label.c_str(), data);
+        ImGui::InputInt(label.c_str(), (s32*)data);
     } else if constexpr (std::is_same<type_t, mz::ivec2>()) {
-        ImGui::InputInt2(label.c_str(), data);
+        ImGui::InputInt2(label.c_str(), (s32*)data);
     } else if constexpr (std::is_same<type_t, mz::ivec3>()) {
-        ImGui::InputInt3(label.c_str(), data);
+        ImGui::InputInt3(label.c_str(), (s32*)data);
     } else if constexpr (std::is_same<type_t, mz::ivec4>()) {
-        ImGui::InputInt4(label.c_str(), data);
+        ImGui::InputInt4(label.c_str(), (s32*)data);
     } else if constexpr (std::is_same<type_t, f32>()) {
         ImGui::InputFloat(label.c_str(), data, 0.1f, 0.2f, 5);
     } else if constexpr (std::is_same<type_t, mz::fvec2>()) {
@@ -537,17 +539,17 @@ extern "C" {
 
     std::vector<Struct_Item> structs;
     std::vector<Token> previous_tokens;
-    bool first_tag_found = false;
     std::set<std::string> tags;
 
     for (auto& file_path : files) {
+        std::cout << "\nDoing file " << file_path << "\n";
         auto src = read_file(file_path);
         Lexer lex(src.c_str());
 
         
         #define is_end(t) t.is_one_of(Token::Kind::End, Token::Kind::Unexpected)
         for (auto token = lex.next(); !is_end(token); token = lex.next()) {
-            if (token.is(Token::Kind::Identifier) && token.lexeme() == "tag" && first_tag_found) {
+            if (token.is(Token::Kind::Identifier) && token.lexeme() == "tag") {
                 auto next = lex.next();
                 if (!next.is(Token::Kind::LeftParen)) {
                     std::cout << red << "Expected '(' for tag list open\n" << white;
@@ -560,14 +562,13 @@ extern "C" {
                         done(-1);
                     }
                     if (next.is(Token::Kind::Identifier)) {
+                        std::cout << "\nFound tag '" << next.lexeme() << "'\n";
                         tags.emplace(next.lexeme());
                     }
                     next = lex.next();
                 }
                 token = next;
             }
-
-            if (token.lexeme() == "tag") first_tag_found = true;
 
             if (token.is(Token::Kind::Identifier) && token.lexeme() == "struct") {
                 Struct_Item item;
@@ -582,7 +583,7 @@ extern "C" {
                 item.name = token.lexeme();
 
                 tags.clear();
-
+                std::cout << "\nFound struct '" << item.name << "'\n";
                 structs.push_back(item);
             }
 
@@ -603,7 +604,7 @@ extern "C" {
                     item.name = second.lexeme();
                     item.tags = tags;
                     tags.clear();
-
+                    std::cout << "\nFound member '" << item.name << "'\n";
                     struct_item.members.push_back(item);
                 }
             }
@@ -633,29 +634,65 @@ extern "C" {
                 output_stream << "            \n";
                 output_stream << "                \"" << struct_item.name << "\",\n";
                 output_stream << "                id,\n";
+                output_stream << "                " << (struct_item.tags.find("custom_gui") != struct_item.tags.end() ? "true" : "false")  << ",\n";
 
                 output_stream << "                std::vector<Property_Info> {\n";
                 std::vector<std::string> sizeofs;
                 for (auto& member : struct_item.members) {
-                    for (auto& tag : member.tags) {
-                        if (tag == "property") {
-                            std::string this_sizeof = "sizeof(" + member.property_type + ")";
-                            std::string this_offset = "";
-                            for (auto& asizeof : sizeofs) this_offset += asizeof+ + "+";
-                            if (this_offset.size() > 1) this_offset.pop_back();
-                            if (this_offset == "") this_offset = "0";
-                            output_stream << "                    Property_Info { \n";
-                            output_stream << "                        [](void* data, ImGuiContext* ctx) {\n";
-                            output_stream << "                            do_gui<" << member.property_type << ">(\"" << member.name << "\", (" << member.property_type << "*)data, ctx);\n";
-                            output_stream << "                        },\n";
-                            output_stream << "                        \"" << member.name << "\",\n";
-                            output_stream << "                        " << this_sizeof << ",\n";
-                            output_stream << "                        " << this_offset << ",\n";
-                            output_stream << "                    },\n";
+                    std::cout << "\n" << member.name << "\n";
+                    std::string this_sizeof = "sizeof(" + member.property_type + ")";
+                    if (member.tags.find("property") != member.tags.end() || struct_item.tags.find("custom_gui") != struct_item.tags.end()) {
+                        std::string this_offset = "";
+                        for (auto& asizeof : sizeofs) this_offset += asizeof+ + "+";
+                        if (this_offset.size() > 1) this_offset.pop_back();
+                        if (this_offset == "") this_offset = "0";
+                        output_stream << "                    Property_Info { \n";
+                        output_stream << "                        [](void* data, ImGuiContext* ctx) {\n";
 
-                            sizeofs.push_back(this_sizeof);
+                        if (struct_item.tags.find("custom_gui") != struct_item.tags.end()) {
+                            output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
+                            output_stream << "                            on_gui((" << struct_item.name << "*)data, ctx);\n";
+                        } else if (member.tags.find("string")  != member.tags.end()) {
+                            output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
+                            output_stream << "                            std::string s = (char*)data;\n";
+                            output_stream << "                            ImGui::InputText(\"" << member.name << "\", &s);\n";
+                            output_stream << "                            strcpy((char*)data, s.c_str());\n";
+                        } else if (member.tags.find("color")  != member.tags.end()) {
+                            output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
+                            output_stream << "                            ImGui::ColorEdit4(\"" << member.name << "\", (f32*)data);\n";
+                        } else if (member.tags.find("texture")  != member.tags.end()) {
+                            output_stream << "                            (void)data;\n";
+                            output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
+                            output_stream << "                            Asset_Request_View view_request;\n";
+                            output_stream << "                            view_request.asset_id = *(asset_id_t*)data;\n";
+                            output_stream << "                            Asset* asset_view = get_module(\"asset_manager\")->request<Asset*>(&view_request);\n";
+                            output_stream << "                            char na[] = \"<none>\";\n";
+                            output_stream << "                            if (asset_view) ImGui::InputText(\"" << member.name << "\", asset_view->file_name, strlen(asset_view->file_name));\n";
+                            output_stream << "                            else ImGui::InputText(\"" << member.name << "\", na, strlen(na));\n";
+                            output_stream << "                            if (ImGui::BeginDragDropTarget()) {\n";
+                            output_stream << "                                auto* p = ImGui::AcceptDragDropPayload(\"asset\");\n";
+                            output_stream << "                                if (p) {\n";
+                            output_stream << "                                    auto payload = (Gui_Payload*)p->Data;\n";
+                            output_stream << "                                    auto new_id = (asset_id_t)(uintptr_t)payload->value;\n";
+                            output_stream << "                                    view_request.asset_id = new_id;\n";
+                            output_stream << "                                    asset_view = get_module(\"asset_manager\")->request<Asset*>(&view_request);\n";
+                            output_stream << "                                    if (asset_view && asset_view->asset_type == ASSET_TYPE_TEXTURE) memcpy(data, &new_id, sizeof(asset_id_t));\n";
+                            output_stream << "                                }\n";
+                            output_stream << "                            ImGui::EndDragDropTarget();\n";
+                            output_stream << "                            }\n";
+                        } else { 
+                            output_stream << "                            do_gui<" << member.property_type << ">(\"" << member.name << "\", (" << member.property_type << "*)data, ctx);\n";
                         }
+
+                        output_stream << "                        },\n";
+                        output_stream << "                        \"" << member.name << "\",\n";
+                        output_stream << "                        " << this_sizeof << ",\n";
+                        output_stream << "                        " << this_offset << ",\n";
+                        output_stream << "                    },\n";
+
+
                     }
+                    sizeofs.push_back(this_sizeof);
                 }
                 output_stream << "                }\n";
                 output_stream << "            };\n";

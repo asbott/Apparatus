@@ -7,16 +7,17 @@ void work(thread_id_t tid, Dynamic_Array<Thread_Context>* pcontexts) {
 	while (!contexts[tid].kill) {
 		while (contexts[tid].pause);
 		auto cmd = contexts[tid].task_queue.front();
-		if (cmd.has_value()) {
+		while (cmd.has_value()) {
 			cmd.value()();
 			contexts[tid].task_queue.pop();
+			cmd = contexts[tid].task_queue.front();
 		}
 	}
 	contexts[tid].dead = true;
 }
 
 Thread_Server::Thread_Server() {
-	_thread_contexts.reserve(MAX_NUMBER_OF_THREADS);
+	
 }
 Thread_Server::~Thread_Server() {
 	for (int i = 0; i < _thread_contexts.size(); i++) {
@@ -41,10 +42,13 @@ thread_id_t Thread_Server::make_thread(bool start) {
 		tid = (thread_id_t)_thread_contexts.size();
 		Thread_Context ctx;
 		ctx.pause = !start;
-		_thread_contexts.push_back(ctx);
+		_thread_contexts.push_back(std::move(ctx));
 	}
 	
-	std::thread(work, tid, &_thread_contexts).detach();
+	auto t = std::thread(work, tid, &_thread_contexts);
+	log_trace("Created a thread '{}' with os id '{}'", tid, t.get_id());
+	_thread_contexts[tid].id = t.get_id();
+	t.detach();
 	return tid;
 }
 
@@ -66,6 +70,7 @@ void Thread_Server::queue_task(thread_id_t tid, const Thread_Task& task) {
 }
 
 void Thread_Server::wait_for_thread(thread_id_t tid) {
+	if (std::this_thread::get_id() == _thread_contexts[tid].id) return;
 	auto& ctx = _thread_contexts[tid];
 	while (ctx.task_queue.size() > 0);
 }

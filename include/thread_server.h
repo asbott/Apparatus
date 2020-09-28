@@ -6,10 +6,25 @@ constexpr thread_id_t NULL_THREAD = (thread_id_t)0 - (thread_id_t)1;
 typedef std::function<void()> Thread_Task;
 
 struct Thread_Context {
+	Thread_Context() = default;
+	Thread_Context(const Thread_Context& src) {
+		task_queue = src.task_queue;
+		pause.store(src.pause.load());
+		kill.store(src.kill.load());
+		dead.store(src.dead.load());
+	}
+	Thread_Context(Thread_Context&& src) {
+		task_queue = std::move(src.task_queue);
+		pause.store(src.pause.load());
+		kill.store(src.kill.load());
+		dead.store(src.dead.load());
+	}
 	Thread_Safe_Queue<Thread_Task> task_queue;
-	bool pause;
-	bool kill = false;
-	bool dead = false;
+	std::atomic<bool> pause;
+	std::atomic<bool> kill = false;
+	std::atomic<bool> dead = false;
+
+	std::thread::id id;
 };
 
 struct Thread_Server {

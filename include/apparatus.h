@@ -14,3 +14,6 @@
 #include "image_import.h"
 
 using namespace mz;
+
+#define _export __declspec(dllexport)
+#define tag(...)

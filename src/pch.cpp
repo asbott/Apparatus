@@ -7,7 +7,9 @@ const char* get_executable_path() {
     return executable_path;
 }
 void ___set_executable_path(const char* path) {
-    strcpy(executable_path, path);
+    path_str_t actual = "";
+    Path::to_absolute(path, actual);
+    strcpy(executable_path, actual);
     Path::directory_of(executable_path, executable_directory);
 }
 

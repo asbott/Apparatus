@@ -1,8 +1,10 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/test_module/test.h"
+#include "D:/dev/Apparatus/modules/ecs_2d_renderer/ecs_2d_renderer.h"
 
 #include <vector>
 #include <functional>
+
+#include <misc/cpp/imgui_stdlib.h>
 
 Hash_Set<uintptr_t> runtime_ids;
 Hash_Map<std::string, uintptr_t> name_id_map;
@@ -17,13 +19,13 @@ void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
     if constexpr (std::is_same<type_t, bool>()) {
         ImGui::Checkbox(label.c_str(), data);
     } else if constexpr (std::is_integral<type_t>()) {
-        ImGui::InputInt(label.c_str(), data);
+        ImGui::InputInt(label.c_str(), (s32*)data);
     } else if constexpr (std::is_same<type_t, mz::ivec2>()) {
-        ImGui::InputInt2(label.c_str(), data);
+        ImGui::InputInt2(label.c_str(), (s32*)data);
     } else if constexpr (std::is_same<type_t, mz::ivec3>()) {
-        ImGui::InputInt3(label.c_str(), data);
+        ImGui::InputInt3(label.c_str(), (s32*)data);
     } else if constexpr (std::is_same<type_t, mz::ivec4>()) {
-        ImGui::InputInt4(label.c_str(), data);
+        ImGui::InputInt4(label.c_str(), (s32*)data);
     } else if constexpr (std::is_same<type_t, f32>()) {
         ImGui::InputFloat(label.c_str(), data, 0.1f, 0.2f, 5);
     } else if constexpr (std::is_same<type_t, mz::fvec2>()) {
@@ -43,98 +45,122 @@ extern "C" {
 	__declspec(dllexport) void __cdecl init() {
 
         {
-            uintptr_t id = (uintptr_t)typeid(Transform).name();
+            uintptr_t id = (uintptr_t)typeid(Transform2D).name();
             runtime_ids.emplace(id);
-            name_id_map["Transform"] = id;
+            name_id_map["Transform2D"] = id;
             component_info[id] = {
                 [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<Transform>(entity);
+                    return &reg.emplace<Transform2D>(entity);
                 },
                 [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<Transform>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<Transform>(entity);
+                    if (!reg.has<Transform2D>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<Transform2D>(entity);
                 }, 
                 [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<Transform>(entity);
+                    reg.remove<Transform2D>(entity);
                 },
             
-                "Transform",
+                "Transform2D",
                 id,
+                true,
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec3>("position", (fvec3*)data, ctx);
+                            ImGui::SetCurrentContext(ctx);
+                            on_gui((Transform2D*)data, ctx);
                         },
-                        "position",
-                        sizeof(fvec3),
+                        "matrix",
+                        sizeof(fmat4),
+                        0,
+                    },
+                }
+            };
+        }
+        {
+            uintptr_t id = (uintptr_t)typeid(Sprite2D).name();
+            runtime_ids.emplace(id);
+            name_id_map["Sprite2D"] = id;
+            component_info[id] = {
+                [](entt::registry& reg, entt::entity entity) { 
+                    return &reg.emplace<Sprite2D>(entity);
+                },
+                [](entt::registry& reg, entt::entity entity) { 
+                    if (!reg.has<Sprite2D>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<Sprite2D>(entity);
+                }, 
+                [](entt::registry& reg, entt::entity entity) { 
+                    reg.remove<Sprite2D>(entity);
+                },
+            
+                "Sprite2D",
+                id,
+                false,
+                std::vector<Property_Info> {
+                    Property_Info { 
+                        [](void* data, ImGuiContext* ctx) {
+                            (void)data;
+                            ImGui::SetCurrentContext(ctx);
+                            Asset_Request_View view_request;
+                            view_request.asset_id = *(asset_id_t*)data;
+                            Asset* asset_view = get_module("asset_manager")->request<Asset*>(&view_request);
+                            char na[] = "<none>";
+                            if (asset_view) ImGui::InputText("texture", asset_view->file_name, strlen(asset_view->file_name));
+                            else ImGui::InputText("texture", na, strlen(na));
+                            if (ImGui::BeginDragDropTarget()) {
+                                auto* p = ImGui::AcceptDragDropPayload("asset");
+                                if (p) {
+                                    auto payload = (Gui_Payload*)p->Data;
+                                    auto new_id = (asset_id_t)(uintptr_t)payload->value;
+                                    view_request.asset_id = new_id;
+                                    asset_view = get_module("asset_manager")->request<Asset*>(&view_request);
+                                    if (asset_view && asset_view->asset_type == ASSET_TYPE_TEXTURE) memcpy(data, &new_id, sizeof(asset_id_t));
+                                }
+                            ImGui::EndDragDropTarget();
+                            }
+                        },
+                        "texture",
+                        sizeof(asset_id_t),
                         0,
                     },
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec2>("scale", (fvec2*)data, ctx);
+                            ImGui::SetCurrentContext(ctx);
+                            ImGui::ColorEdit4("tint", (f32*)data);
                         },
-                        "scale",
-                        sizeof(fvec2),
-                        sizeof(fvec3),
-                    },
-                    Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec4>("color", (fvec4*)data, ctx);
-                        },
-                        "color",
-                        sizeof(fvec4),
-                        sizeof(fvec3)+sizeof(fvec2),
+                        "tint",
+                        sizeof(color),
+                        sizeof(asset_id_t),
                     },
                 }
             };
         }
         {
-            uintptr_t id = (uintptr_t)typeid(SpriteComponent).name();
+            uintptr_t id = (uintptr_t)typeid(View2D).name();
             runtime_ids.emplace(id);
-            name_id_map["SpriteComponent"] = id;
+            name_id_map["View2D"] = id;
             component_info[id] = {
                 [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<SpriteComponent>(entity);
+                    return &reg.emplace<View2D>(entity);
                 },
                 [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<SpriteComponent>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<SpriteComponent>(entity);
+                    if (!reg.has<View2D>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<View2D>(entity);
                 }, 
                 [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<SpriteComponent>(entity);
+                    reg.remove<View2D>(entity);
                 },
             
-                "SpriteComponent",
+                "View2D",
                 id,
-                std::vector<Property_Info> {
-                }
-            };
-        }
-        {
-            uintptr_t id = (uintptr_t)typeid(SpeedComponent).name();
-            runtime_ids.emplace(id);
-            name_id_map["SpeedComponent"] = id;
-            component_info[id] = {
-                [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<SpeedComponent>(entity);
-                },
-                [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<SpeedComponent>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<SpeedComponent>(entity);
-                }, 
-                [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<SpeedComponent>(entity);
-                },
-            
-                "SpeedComponent",
-                id,
+                false,
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
-                            do_gui<float>("speed", (float*)data, ctx);
+                            ImGui::SetCurrentContext(ctx);
+                            ImGui::ColorEdit4("clear_color", (f32*)data);
                         },
-                        "speed",
-                        sizeof(float),
+                        "clear_color",
+                        sizeof(color16),
                         0,
                     },
                 }

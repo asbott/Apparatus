@@ -146,6 +146,7 @@ struct AP_API Graphics_Context {
     virtual void set_texture_filtering(graphics_id_t texture, graphics_enum_t min_filter_mode, graphics_enum_t mag_filter_mode) = 0;
     virtual void set_texture_multisampling(graphics_id_t texture, u32 count, u32 quality) = 0;
     virtual void bind_texture_to_slot(graphics_id_t texture, graphics_enum_t slot) = 0;
+    virtual void* get_native_texture_handle(graphics_id_t texture) = 0;
 
     virtual void set_clear_color(mz::color16 color) = 0;
 
@@ -153,7 +154,7 @@ struct AP_API Graphics_Context {
 
     virtual void clear(graphics_enum_t clear_flags) = 0;
 
-    virtual void draw_indices(graphics_id_t vao, graphics_id_t shader, graphics_id_t ubo = G_NULL_ID, graphics_enum_t draw_mode = G_DRAW_MODE_TRIANGLES) = 0;
+    virtual void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo = G_NULL_ID, graphics_enum_t draw_mode = G_DRAW_MODE_TRIANGLES) = 0;
 
     virtual void associate_vertex_buffer(graphics_id_t vbo, graphics_id_t vao) = 0;
     virtual void associate_index_buffer(graphics_id_t ibo, graphics_id_t vao) = 0;
@@ -301,6 +302,13 @@ struct AP_API Graphics : public Graphics_Context {
         _thread_server->queue_task(_tid, [this, texture, slot]() { _inst.bind_texture_to_slot(texture, slot); });
     }
 
+    _ap_force_inline void* get_native_texture_handle(graphics_id_t texture) override {
+        void* ret = 0;
+        _thread_server->queue_task(_tid, [this, &ret, texture]() { ret = _inst.get_native_texture_handle(texture); });
+        _thread_server->wait_for_thread(_tid);
+        return ret;
+    }
+
     _ap_force_inline void set_clear_color(mz::color16 color) override {
         _thread_server->queue_task(_tid, [this, color]() { _inst.set_clear_color(color); });
     }
@@ -313,8 +321,8 @@ struct AP_API Graphics : public Graphics_Context {
         _thread_server->queue_task(_tid, [this, clear_flags]() { _inst.clear(clear_flags); });
     }
 
-    _ap_force_inline void draw_indices(graphics_id_t vao, graphics_id_t shader, graphics_id_t ubo, graphics_enum_t draw_mode = G_DRAW_MODE_TRIANGLES) override {
-        _thread_server->queue_task(_tid, [this, vao, shader, ubo, draw_mode]() { _inst.draw_indices(vao, shader, ubo, draw_mode); });
+    _ap_force_inline void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode = G_DRAW_MODE_TRIANGLES) override {
+        _thread_server->queue_task(_tid, [this, vao, shader, index_count, ubo, draw_mode]() { _inst.draw_indices(vao, shader, index_count, ubo, draw_mode); });
     }
 
     _ap_force_inline void associate_vertex_buffer(graphics_id_t vbo, graphics_id_t vao) override {
@@ -422,10 +430,11 @@ void set_texture_wrapping(graphics_id_t texture, graphics_enum_t wrap_mode);\
 void set_texture_filtering(graphics_id_t texture, graphics_enum_t min_filter_mode, graphics_enum_t mag_filter_mode);\
 void set_texture_multisampling(graphics_id_t texture, u32 count, u32 quality);\
 void bind_texture_to_slot(graphics_id_t texture, graphics_enum_t slot);\
+void* get_native_texture_handle(graphics_id_t texture);\
 void set_clear_color(mz::color16 color);\
 void set_viewport(mz::viewport viewport);\
 void clear(graphics_enum_t clear_flags);\
-void draw_indices(graphics_id_t vao, graphics_id_t shader, graphics_id_t ubo, graphics_enum_t draw_mode);\
+void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode);\
 void associate_vertex_buffer(graphics_id_t vbo, graphics_id_t vao);\
 void associate_index_buffer(graphics_id_t ibo, graphics_id_t vao);\
 void set_vertex_buffer_data(graphics_id_t vbo, void* data, size_t offset, size_t sz);\

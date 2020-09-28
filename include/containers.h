@@ -45,6 +45,12 @@ struct Thread_Safe_Queue {
         _queue = other._queue;
     }
 
+    Thread_Safe_Queue& operator=(const Thread_Safe_Queue& other) {
+        std::lock_guard<std::mutex> lock(_mutex);
+        _queue = other._queue;
+        return *this;
+    }
+
     virtual ~Thread_Safe_Queue() { }
 
     size_t size() const {

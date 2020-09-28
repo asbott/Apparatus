@@ -36,6 +36,14 @@ Thread_Server g_thread_server;
 thread_id_t g_graphics_thread;
 entt::registry g_reg;
 
+Dynamic_Array<Module*> g_modules;
+
+Hash_Set<Gui_Window*> gui_windows;
+Hash_Set<Gui_Popup*> gui_popups;
+
+Gui_Window entity_inspector = { true, "Entity Inspector" };
+Gui_Window scene_inspector = { true, "Scene Inspector" };
+
 void quit() {
     g_running = false;
 }
@@ -44,12 +52,48 @@ entt::registry& get_entity_registry() {
     return g_reg;
 }
 
+Module* get_module(name_str_t str_id) {
+    for (auto* mod : g_modules) {
+        if (strcmp(mod->str_id, str_id) == 0) return mod;
+    }
+    return NULL;
+}
+
+void register_gui_window(Gui_Window* wnd) {
+    gui_windows.emplace(wnd);
+}
+
+void unregister_gui_window(Gui_Window* wnd) {
+    gui_windows.erase(wnd);
+}
+
+void register_gui_popup(Gui_Popup* pop) {
+    gui_popups.emplace(pop);
+}
+
+void unregister_gui_popup(Gui_Popup* pop) {
+    gui_popups.erase(pop);
+}
+
 Thread_Server& get_thread_server() {
     return g_thread_server;
 }
 
 thread_id_t get_graphics_thread() {
     return g_graphics_thread;
+}
+
+void register_module(name_str_t mod_name) {
+
+    path_str_t mod_path = "";
+    path_str_t mod_path_new = "";
+    sprintf(mod_path, "%s/../runtime/%s_used.dll", get_executable_directory(), mod_name);
+    sprintf(mod_path_new, "%s/../runtime/%s.dll", get_executable_directory(), mod_name);
+
+    auto err = Path::copy(mod_path_new, mod_path);
+    ap_assert(err.value() == 0, "Copy fail: {}", err.message());
+
+    g_modules.push_back(new Module(mod_path, mod_path_new, mod_name));
 }
 
 int AP_API start(int argc, char** argv) {
@@ -72,10 +116,8 @@ int AP_API start(int argc, char** argv) {
     log_trace("Exe path: {}\nExe dir:  {}\nExe ext:  {}\nExe name: {}, {}",
         exe, get_executable_directory(), ext, name_with, name_without);
 
-    path_str_t mod_path = "";
-    path_str_t mod_path_new = "";
-    sprintf(mod_path, "%s/../runtime/test_module_used.dll", get_executable_directory());
-    sprintf(mod_path_new, "%s/../runtime/test_module.dll", get_executable_directory());
+    register_gui_window(&scene_inspector);
+    register_gui_window(&entity_inspector);
         
     g_graphics_thread = g_thread_server.make_thread();
 
@@ -83,71 +125,21 @@ int AP_API start(int argc, char** argv) {
     g_graphics->debug_callback = graphics_debug_callback;
     g_graphics->init(true, &g_thread_server, g_graphics_thread);
 
-    typedef void (__cdecl *on_load_t)(Graphics_Context*); 
-    typedef void (__cdecl *on_unload_t)(Graphics_Context*); 
-    typedef void (__cdecl *on_update_t)(float); 
-    typedef void (__cdecl *on_render_t)(Graphics_Context*); 
-    typedef void (__cdecl *on_gui_t)(Graphics_Context*, ImGuiContext*); 
+    register_module("test_module");
+    register_module("ecs_2d_renderer");
+    register_module("asset_manager");
 
-    typedef void (__cdecl *init_t)(); 
-    typedef Component_Info* (__cdecl *get_component_info_t)(uintptr_t); 
-    typedef const Hash_Set<uintptr_t>& (__cdecl *get_component_ids_t)(); 
-    typedef void* (__cdecl *create_component_t)(uintptr_t, entt::registry&, entt::entity); 
-    typedef void* (__cdecl *get_component_t)(uintptr_t, entt::registry&, entt::entity); 
-    typedef void (__cdecl *remove_component_t)(uintptr_t, entt::registry&, entt::entity); 
-    typedef uintptr_t (__cdecl *get_component_id_t)(const std::string&); 
-
-    on_load_t on_load = NULL;
-    on_unload_t on_unload = NULL;
-    on_update_t on_update = NULL;
-    on_render_t on_render = NULL;
-    on_gui_t on_gui = NULL;
-
-    init_t init = NULL;
-    get_component_info_t get_component_info = NULL;
-    get_component_ids_t get_component_ids = NULL;
-    create_component_t create_component = NULL;
-    get_component_t get_component = NULL;
-    remove_component_t remove_component = NULL;
-    get_component_id_t get_component_id = NULL;
-
-    auto err = Path::copy(mod_path_new, mod_path);
-    ap_assert(err.value() == 0, "Copy fail: {}", err.message());
-    
-    
-    #define load_fn(n) n = (n##_t)os::load_module_function(mod, #n);\
-                        if (!n) { log_error("Failed loading " #n); n = NULL; }
-
-    void* mod = NULL;
-
-    auto load_modules = [&]() {
-        mod = os::load_module(mod_path);
-        if (mod) {
-            load_fn(on_load);
-            load_fn(on_unload);
-            load_fn(on_update);
-            load_fn(on_render);
-            load_fn(on_gui);
-
-            load_fn(init);
-            load_fn(get_component_info);
-            load_fn(get_component_ids);
-            load_fn(create_component);
-            load_fn(get_component);
-            load_fn(remove_component);
-            load_fn(get_component_id);
-
-            log_info("Loaded test_module");
-
-            if (on_load) on_load(g_graphics);
-            if (init) init();
-
+    for (auto* mod : g_modules) {
+        log_trace("Loading module '{}'", mod->str_id);
+        if (mod->load()) {
+            log_info("Successfully loaded module '{}'", mod->str_id);
         } else {
-            log_error("Failed loading test_module");
+            log_error("Failed loading module '{}'", mod->str_id);
         }
-    };
 
-    load_modules();
+        if (mod->on_load) mod->on_load(g_graphics);
+        if (mod->init) mod->init();
+    }
 
     while (g_running) {
         
@@ -161,106 +153,130 @@ int AP_API start(int argc, char** argv) {
 
         float delta = (f32)windows->window_info[wnd].delta_time;
 
-        if (on_update) on_update(delta);
+        
+        for (auto* mod : g_modules) if (mod->on_update) mod->on_update(delta);
+        
 
         if (windows->is_key_down(wnd, AP_KEY_R)) {
-            if (mod) {
-                if (on_unload) on_unload(g_graphics);
-                os::free_module(mod);
+            for (auto* mod : g_modules) {
+                if (mod->on_unload) mod->on_unload(g_graphics);
+                mod->reload();
+                if (mod->on_load) mod->on_load(g_graphics);
+                if (mod->init) mod->init();
             }
-
-            err = Path::remove(mod_path);
-            ap_assert(err.value() == 0, "Remove fail: {}", err.message());
-
-            err = Path::copy(mod_path_new, mod_path);
-            ap_assert(err.value() == 0, "Copy fail: {}", err.message());
-
-            load_modules();
         } 
 
-        if (on_render) on_render(g_graphics);
+        for (auto* mod : g_modules) if (mod->on_render) mod->on_render(g_graphics);
 
-        if (on_gui) {
-            ImGui::UseGraphicsContext(g_graphics);
-            g_thread_server.queue_task(g_graphics_thread, [&]() {
-                on_gui(g_graphics, ImGui::GetCurrentContext());    
+        ImGui::UseGraphicsContext(g_graphics);
+        for (auto* mod : g_modules) if (mod->on_gui) mod->on_gui(g_graphics, ImGui::GetCurrentContext());    
+        
+        ImGui::BeginMainMenuBar();
 
-                ImGui::Begin("Scene Inspector", NULL, ImGuiWindowFlags_MenuBar);
+        if (ImGui::BeginMenu("Windows")) {
+            for (auto* gui_wnd : gui_windows) {
+                ImGui::MenuItem(gui_wnd->name, NULL, &gui_wnd->open);
+            }
+            ImGui::EndMenu();
+        }
 
-                ImGui::BeginMenuBar();
-                if (ImGui::BeginMenu("Create")) {
+        ImGui::EndMainMenuBar();
+        static entt::entity selected_entity = entt::null;
 
-                    static str_t<128> buf;
-                    ImGui::InputText("Name", buf, sizeof(buf));
+        ImGui::DoGuiWindow(&scene_inspector, [&]() {
+            ImGui::BeginMenuBar();
+            if (ImGui::BeginMenu("Create")) {
 
-                    if (ImGui::Button("Create")) {
-                        auto entity = g_reg.create();
-                        g_reg.emplace<Entity_Info>(entity);
-                        g_reg.get<Entity_Info>(entity).id = entity;
-                        strcpy(g_reg.get<Entity_Info>(entity).name, buf);
-                        strcpy(buf, "");
-                    }
+                static str_t<128> buf;
+                ImGui::InputText("Name", buf, sizeof(buf));
 
-                    ImGui::EndMenu();
+                if (ImGui::Button("Create")) {
+                    auto entity = g_reg.create();
+                    g_reg.emplace<Entity_Info>(entity);
+                    g_reg.get<Entity_Info>(entity).id = entity;
+                    strcpy(g_reg.get<Entity_Info>(entity).name, buf);
+                    strcpy(buf, "");
                 }
-                ImGui::EndMenuBar();
 
-                static entt::entity selected_entity = entt::null;
+                ImGui::EndMenu();
+            }
+            ImGui::EndMenuBar();
 
-                g_reg.view<Entity_Info>().each([&](entt::entity entity, Entity_Info& entity_info) {
-                    char label[256] = "";
-                    sprintf(label, "%s##%i", entity_info.name, entity_info.id);
-                    
-                    ImGuiTreeNodeFlags flags = 0;
-                    flags |= ImGuiTreeNodeFlags_OpenOnArrow;
-                    if (entity == selected_entity) flags |= ImGuiTreeNodeFlags_Selected;
-                    bool entity_opened = ImGui::TreeNodeEx(label, flags);
-                    if (ImGui::IsItemClicked()) {
-                        selected_entity = entity;
-                    }
-                    if (entity_opened) {
-                        ImGui::TreePop();
-                    }
-                });
+            g_reg.view<Entity_Info>().each([&](entt::entity entity, Entity_Info& entity_info) {
+                char label[256] = "";
+                sprintf(label, "%s##%i", entity_info.name, entity_info.id);
 
-                ImGui::End();
+                ImGuiTreeNodeFlags flags = 0;
+                flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+                if (entity == selected_entity) flags |= ImGuiTreeNodeFlags_Selected;
+                bool entity_opened = ImGui::TreeNodeEx(label, flags);
+                if (ImGui::IsItemClicked()) {
+                    selected_entity = entity;
+                }
+                if (entity_opened) {
+                    ImGui::TreePop();
+                }
+            });
+        }, ImGuiWindowFlags_MenuBar);
 
-                ImGui::Begin("Entity Inspector");
-                if (selected_entity != entt::null) {
-                    const auto& ids = get_component_ids();
+
+        ImGui::DoGuiWindow(&entity_inspector, [&]() {
+            if (selected_entity != entt::null) {
+                for (auto* mod : g_modules) {
+                    const auto& ids = mod->get_component_ids();
                     for (auto id : ids) {
-                        if (void* comp = get_component(id, g_reg, selected_entity)) {
-                            const auto& info = get_component_info(id);
+                        if (void* comp = mod->get_component(id, g_reg, selected_entity)) {
+                            const auto& info = mod->get_component_info(id);
                             bool component_opened = ImGui::TreeNodeEx(info->name.c_str(), ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DefaultOpen);
 
                             if (component_opened) {
-                                for (const auto& prop : info->properties) {
-                                    prop.on_gui((byte*)comp + prop.offset, ImGui::GetCurrentContext());
+                                if (info->has_custom_gui && info->properties.size() > 0) {
+                                    info->properties[0].on_gui(comp, ImGui::GetCurrentContext());
+                                } else {
+                                    for (const auto& prop : info->properties) {
+                                        prop.on_gui((byte*)comp + prop.offset, ImGui::GetCurrentContext());
+                                    }
                                 }
 
                                 ImGui::TreePop();
                             }
                         }
                     }
-
-                    if (ImGui::BeginMenu("Add Component")) {
-
-                        for (auto id : ids) {
-                            const auto& info = get_component_info(id);
-
-                            if (ImGui::MenuItem(info->name.c_str())) {
-                                create_component(id, g_reg, selected_entity);
-                            }
-                        }
-
-                        ImGui::EndMenu();
-                    }
-                } else {
-                    ImGui::Text("No entity selected");
                 }
 
-                ImGui::End();
-            });
+                for (auto* mod : g_modules)  {
+                    if (ImGui::BeginMenu("Add Component")) {
+                        if (ImGui::CollapsingHeader(mod->str_id)) {
+                            const auto& ids = mod->get_component_ids();
+                            for (auto id : ids) {
+                                const auto& info = mod->get_component_info(id);
+
+                                if (ImGui::Selectable(info->name.c_str())) {
+                                    mod->create_component(id, g_reg, selected_entity);
+                                }
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
+                }
+            } else {
+                ImGui::Text("No entity selected");
+            }
+        });
+
+        for (auto* popup : gui_popups) {
+            if (popup->should_open) {
+                popup->should_open = false;
+                ImGui::OpenPopup(popup->str_id);
+            }
+            bool show = popup->is_modal 
+                ? ImGui::BeginPopupModal(popup->str_id)
+                : ImGui::BeginPopup(popup->str_id);
+
+            if (show) {
+                popup->fn();
+                ImGui::EndPopup();
+            }
         }
 
         g_graphics->render_imgui();
@@ -269,6 +285,8 @@ int AP_API start(int argc, char** argv) {
         windows->swap_buffers(wnd);
         
         update_dependencies();
+
+        
     }
 
     shutdown_dependencies();

@@ -431,7 +431,8 @@ void OpenGL45::init(bool show_window) {
 
 OpenGL45::~OpenGL45() {
     _api->_thread_server->queue_task(_api->_tid, [this]() {
-        this->use_imgui_context();
+        glfwMakeContextCurrent((GLFWwindow*)_windows_context.main_window_handle);
+        ImGui::SetCurrentContext(_imgui_context);
         ImGui_ImplGlfw_Shutdown();
         ImGui_ImplOpenGL3_Shutdown();
         ImGui::DestroyContext();
@@ -619,8 +620,10 @@ graphics_id_t OpenGL45::make_texture(graphics_enum_t usage) {
     (void)usage;
     make_context_current();
 
+    send_message(G_DEBUG_MESSAGE_SEVERITY_NOTIFY, "Making texture");
     GLuint texture;
     glGenTextures(1, &texture);
+    send_message(G_DEBUG_MESSAGE_SEVERITY_NOTIFY, "Made texture {}", texture);
 
     return texture;
 }
@@ -716,6 +719,10 @@ void OpenGL45::bind_texture_to_slot(graphics_id_t texture, graphics_enum_t slot)
     glBindTexture(GL_TEXTURE_2D, texture);
 }
 
+void* OpenGL45::get_native_texture_handle(graphics_id_t texture) {
+    return (void*)(uintptr_t)texture;
+}
+
 void OpenGL45::set_clear_color(mz::color16 color) {
     make_context_current();
     glClearColor(color.r, color.g, color.b, color.a);    
@@ -736,7 +743,7 @@ void OpenGL45::clear(graphics_enum_t clear_flags) {
     glClear(gl_clear_flags);
 }
 
-void OpenGL45::draw_indices(graphics_id_t vao, graphics_id_t shader, graphics_id_t ubo, graphics_enum_t draw_mode) {
+void OpenGL45::draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode) {
     make_context_current();
     graphics_id_t ibo = _ibo_associations[vao];
 
@@ -755,7 +762,7 @@ void OpenGL45::draw_indices(graphics_id_t vao, graphics_id_t shader, graphics_id
         glBindBuffer(GL_UNIFORM_BUFFER, ubo);
     }
 
-    glDrawElements(convert_draw_mode(draw_mode), (GLsizei)_index_count[ibo], GL_UNSIGNED_INT, NULL);
+    glDrawElements(convert_draw_mode(draw_mode), (GLsizei)index_count, GL_UNSIGNED_INT, NULL);
 
     if (ubo != G_NULL_ID) {
         glBindBuffer(GL_UNIFORM_BUFFER, 0);

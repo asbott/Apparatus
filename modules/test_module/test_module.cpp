@@ -400,13 +400,9 @@
 //	}
 //}
 
-#define _export __declspec(dllexport)
-
 #include "apparatus.h"
 
 #include "test.h"
-
-#define something
 
 extern "C" {
 	_export void __cdecl on_load(Graphics_Context* graphics) {
@@ -424,15 +420,10 @@ extern "C" {
     _export void __cdecl on_update(float delta) {
 		(void)delta;
 
-		get_entity_registry().view<Transform>().each([](Transform& transform) {
-			log_trace("Position: {}\n Scale: {}\nColor: {}", 
-				       transform.position, transform.scale, transform.color);
-		});
+		
     }
 
 	_export void __cdecl on_render(Graphics_Context* graphics) {
-		graphics->clear(G_COLOR_BUFFER_BIT);
-
 		auto windows = graphics->get_windows_context();
 		auto wnd = windows->main_window_handle;
 

@@ -18,7 +18,20 @@ typedef u64 count_t;
 typedef u8  byte;
 typedef s8  sbyte;
 
-using path_str_t = char[MAX_PATH_LENGTH];
-
 template <size_t LEN = 1024>
 using str_t = char[LEN];
+
+#define __def_str_t(nbytes) using str##nbytes##_t = str_t<nbytes>
+
+__def_str_t(16);
+__def_str_t(32);
+__def_str_t(64);
+__def_str_t(128);
+__def_str_t(256);
+__def_str_t(512);
+__def_str_t(1024);
+
+typedef str1024_t path_str_t;
+typedef str128_t name_str_t;
+
+typedef const char* str_ptr_t;
