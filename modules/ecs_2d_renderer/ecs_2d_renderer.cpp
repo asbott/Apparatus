@@ -875,13 +875,13 @@ extern "C" {
 				game_input()->mouse_world_pos = mouse_world_pos;
 
 				for (int i = AP_KEY_SPACE; i < AP_KEY_COUNT; i++) {
-					game_input()->state.keys_press[i] = ImGui::IsItemHovered() && ImGui::IsKeyPressed(i);
-					game_input()->state.keys_down[i] = ImGui::IsItemHovered() && ImGui::IsKeyDown(i);
+					game_input()->state.keys_press[i] = is_game_hovered && ImGui::IsKeyPressed(i, false);
+					game_input()->state.keys_down[i] = is_game_hovered && ImGui::IsKeyDown(i);
 				}
 
 				for (int i = AP_MOUSE_BUTTON_1; i < AP_MOUSE_BUTTON_COUNT; i++) {
-					game_input()->state.mouse_press[i] = ImGui::IsItemHovered() && ImGui::IsMouseClicked(i);
-					game_input()->state.mouse_down[i] = ImGui::IsItemHovered() && ImGui::IsMouseDown(i);
+					game_input()->state.mouse_press[i] = is_game_hovered && ImGui::IsMouseClicked(i);
+					game_input()->state.mouse_down[i] = is_game_hovered && ImGui::IsMouseDown(i);
 				}
 			} else {
 				ImGui::Text("No valid entity with View2D and Transform2D selected");

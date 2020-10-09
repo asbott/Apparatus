@@ -47,6 +47,7 @@ Gui_Window entity_inspector = { true, "Entity Inspector" };
 Gui_Window scene_inspector = { true, "Scene Inspector" };
 Gui_Window module_manager = { false, "Modules Manager" };
 Gui_Window log_window = { false, "Log" };
+Gui_Window style_editor = { false, "Style Editor" };
 
 Gui_Popup add_component_popup;
 Gui_Popup manage_component_popup;
@@ -359,6 +360,8 @@ int start(int argc, char** argv) {
 
     path_str_t ecs_path = "";
     sprintf(ecs_path, "%s/ecs", project_dir);
+    path_str_t style_path = "";
+    sprintf(style_path, "%s/style", project_dir);
 
     path_str_t essential_dir = "";
     sprintf(essential_dir, "%s/../../essential", get_executable_directory());
@@ -369,6 +372,7 @@ int start(int argc, char** argv) {
     register_gui_window(&entity_inspector);
     register_gui_window(&module_manager);
     register_gui_window(&log_window);
+    register_gui_window(&style_editor);
 
     add_component_popup.is_modal = true;
     strcpy(add_component_popup.str_id, "Add Component");
@@ -423,6 +427,10 @@ int start(int argc, char** argv) {
     g_graphics = new Graphics<Default_Api>();
     g_graphics->debug_callback = graphics_debug_callback;
     g_graphics->init(true, &g_thread_server, g_graphics_thread);
+
+    g_thread_server.wait_for_thread(g_graphics_thread);
+
+    ImGui::LoadStyleFromDisk(style_path);
 
     register_module("test_module");
     register_module("ecs_2d_renderer");
@@ -572,12 +580,14 @@ int start(int argc, char** argv) {
             if (!is_playing) {
                 to_file(g_reg, ecs_path);
                 for (auto mod : g_modules) if (mod->save_to_disk) mod->save_to_disk(project_dir);
+                ImGui::SaveStyleToDisk(style_path);
                 g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_begin = true;
             } else {
                 g_reg.clear();
                 from_file(g_reg, ecs_path);
                 for (auto mod : g_modules) if (mod->load_from_disk) mod->load_from_disk(project_dir);
+                ImGui::LoadStyleFromDisk(style_path);
                 g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_stop = true;
             }
@@ -603,6 +613,13 @@ int start(int argc, char** argv) {
                 }
 
                 ImGui::EndMenu();
+            }
+
+            if (ImGui::MenuItem("Remove", "del", false, g_selected_entities.size() > 0) || ImGui::IsKeyPressed(AP_KEY_DELETE)) {
+                for (auto entity : g_selected_entities) {
+                    g_reg.destroy(entity);
+                }
+                deselect_all_entities();
             }
             ImGui::EndMenuBar();
 
@@ -676,6 +693,10 @@ int start(int argc, char** argv) {
             if (g_selected_entities.size() == 0) {
                 ImGui::Text("No entity selected");
             }
+        });
+
+        ImGui::DoGuiWindow(&style_editor, []() {
+            ImGui::ShowStyleEditor();
         });
 
         for (auto* popup : gui_popups) {

@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/test_module/test.h"
+#include "D:/dev/Apparatus/modules/test_module/test_module.h"
 
 #include <vector>
 #include <functional>
@@ -45,40 +45,40 @@ extern "C" {
 	__declspec(dllexport) void __cdecl init() {
 
         {
-            uintptr_t id = (uintptr_t)typeid(KeyboardMovement).name();
+            uintptr_t id = (uintptr_t)typeid(WASDMovement).name();
             runtime_ids.emplace(id);
-            name_id_map["KeyboardMovement"] = id;
+            name_id_map["WASDMovement"] = id;
             component_info[id] = {
                 [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<KeyboardMovement>(entity);
+                    return &reg.emplace<WASDMovement>(entity);
                 },
                 [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<KeyboardMovement>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<KeyboardMovement>(entity);
+                    if (!reg.has<WASDMovement>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<WASDMovement>(entity);
                 }, 
                 [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<KeyboardMovement>(entity);
+                    reg.remove<WASDMovement>(entity);
                 },
             
-                "KeyboardMovement",
+                "WASDMovement",
                 id,
                 false,
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
-                            do_gui<float>("vspeed", (float*)data, ctx);
+                            do_gui<f32>("hspeed", (f32*)data, ctx);
                         },
-                        "vspeed",
-                        sizeof(float),
+                        "hspeed",
+                        sizeof(f32),
                         0,
                     },
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
-                            do_gui<float>("hspeed", (float*)data, ctx);
+                            do_gui<f32>("jump_force", (f32*)data, ctx);
                         },
-                        "hspeed",
-                        sizeof(float),
-                        sizeof(float),
+                        "jump_force",
+                        sizeof(f32),
+                        sizeof(f32),
                     },
                 }
             };

@@ -20,7 +20,6 @@ namespace ImGui {
             ImGui::SetTooltip(label);
         }
         auto wnd = ImGui::GetCurrentWindow();
-        log_trace(wnd->MenuBarHeight());
         if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
             SameLine();
         } else {
@@ -33,23 +32,23 @@ namespace ImGui {
 
     bool RInputText(const char* label, char* buf, size_t buf_size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
-        PushID(buf);
-        bool ret = InputText("", buf, buf_size, flags, callback, user_data);
-        PopID();
+        str_t<128> id = "";
+        sprintf(id, "##%llu", (uintptr_t)buf);
+        bool ret = InputText(id, buf, buf_size, flags, callback, user_data);
         return ret;
     }
     bool RInputTextMultiline(const char* label, char* buf, size_t buf_size, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
-        PushID(buf);
-        bool ret = InputTextMultiline("", buf, buf_size, size, flags, callback, user_data);
-        PopID();
+        str_t<128> id = "";
+        sprintf(id, "##%llu", (uintptr_t)buf);
+        bool ret = InputTextMultiline(id, buf, buf_size, size, flags, callback, user_data);
         return ret;
     }
     bool RInputTextWithHint(const char* label, const char* hint, char* buf, size_t buf_size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
-        PushID(buf);
-        bool ret = InputTextWithHint("", hint, buf, buf_size, flags, callback, user_data);
-        PopID();
+        str_t<128> id = "";
+        sprintf(id, "##%llu", (uintptr_t)buf);
+        bool ret = InputTextWithHint(id, hint, buf, buf_size, flags, callback, user_data);
         return ret;
     }
     bool RInputFloat(const char* label, float* v, float step, float step_fast, const char* format, ImGuiInputTextFlags flags) {
@@ -240,36 +239,44 @@ namespace ImGui {
         return g_ext_style;
     }
 
-    str_ptr_t GetStyleVarName(ImGuiStyleVar var) {
-        switch (var)
-        {
-            case ImGuiStyleVar_Alpha:               return "Alpha";
-            case ImGuiStyleVar_WindowPadding:       return "Window Padding";
-            case ImGuiStyleVar_WindowRounding:      return "Window Rounding";
-            case ImGuiStyleVar_WindowBorderSize:    return "Window Border Size"; 
-            case ImGuiStyleVar_WindowMinSize:       return "Window Min Size";
-            case ImGuiStyleVar_WindowTitleAlign:    return "Window Title Align";
-            case ImGuiStyleVar_ChildRounding:       return "Child Rounding";
-            case ImGuiStyleVar_ChildBorderSize:     return "Child Border Size";
-            case ImGuiStyleVar_PopupRounding:       return "Popup Rounding";
-            case ImGuiStyleVar_PopupBorderSize:     return "Popup Border Size";
-            case ImGuiStyleVar_FramePadding:        return "Frame Padding";
-            case ImGuiStyleVar_FrameRounding:       return "Frame Rounding";
-            case ImGuiStyleVar_FrameBorderSize:     return "Frame Border Size";
-            case ImGuiStyleVar_ItemSpacing:         return "Item Spacing";
-            case ImGuiStyleVar_ItemInnerSpacing:    return "Item Inner Spacing";
-            case ImGuiStyleVar_IndentSpacing:       return "Indent Spacing";
-            case ImGuiStyleVar_ScrollbarSize:       return "Scrollbar Size";
-            case ImGuiStyleVar_ScrollbarRounding:   return "Scrollbar Rounding";
-            case ImGuiStyleVar_GrabMinSize:         return "Grab Min Size";
-            case ImGuiStyleVar_GrabRounding:        return "Grab Rounding";
-            case ImGuiStyleVar_TabRounding:         return "Tab Rounding";
-            case ImGuiStyleVar_ButtonTextAlign:     return "Button Text Align";
-            case ImGuiStyleVar_SelectableTextAlign: return "Selectable Text Align";
-        
-        default:
-            return "N/A";
+    void SaveStyleToDisk(str_ptr_t path) {
+        std::ofstream ostr;
+        ostr.open(path);
+        if (!ostr.good()) return;
+
+        byte* style_data = (byte*)&ImGui::GetStyle();
+
+        for (int i = 0; i < sizeof(ImGuiStyle); i++) {
+            ostr << (int)style_data[i] << " ";
         }
+
+        ostr.close();
+    }
+    void LoadStyleFromDisk(str_ptr_t path) {
+        if (!Path::can_open(path)) return;
+        std::ifstream istr;
+        istr.open(path);
+
+        byte* style_data = (byte*)&ImGui::GetStyle();
+
+        Dynamic_Array<byte> bytes;
+
+        while (!istr.eof()) {
+            str_t<4> byte_str = "";
+
+            istr >> byte_str;
+
+            bool is_num = true;
+            for (int i = 0; i < strlen(byte_str); i++) if (!isdigit(byte_str[i]) ) is_num = false;
+
+            if (!is_num) continue;
+
+            bytes.push_back((byte)atoi(byte_str));
+        }
+
+        memcpy(style_data, bytes.data(), bytes.size());
+
+        istr.close();
     }
     
 }

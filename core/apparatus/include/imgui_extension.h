@@ -45,5 +45,6 @@ namespace ImGui {
 
     AP_API ImGuiExtensionStyle& GetExtensionStyle();
 
-    AP_API str_ptr_t GetStyleVarName(ImGuiStyleVar var);
+    AP_API void SaveStyleToDisk(str_ptr_t path);
+    AP_API void LoadStyleFromDisk(str_ptr_t path);
 }
