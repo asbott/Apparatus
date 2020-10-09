@@ -14,6 +14,12 @@ struct Module {
     typedef void (__cdecl *on_render_t)(Graphics_Context*); 
     typedef void (__cdecl *on_gui_t)(Graphics_Context*, ImGuiContext*); 
 
+    typedef void (__cdecl *on_play_begin_t)(); 
+    typedef void (__cdecl *on_play_stop_t)(); 
+
+    typedef void (__cdecl *save_to_disk_t)  (str_ptr_t);
+    typedef void (__cdecl *load_from_disk_t)(str_ptr_t);
+
     typedef void (__cdecl *init_t)(); 
     typedef Component_Info* (__cdecl *get_component_info_t)(uintptr_t); 
     typedef const Hash_Set<uintptr_t>& (__cdecl *get_component_ids_t)(); 
@@ -24,19 +30,27 @@ struct Module {
 
     typedef void* (__cdecl *_request_t)(void* ud);
 
-    on_load_t on_load = NULL;
+    on_load_t   on_load   = NULL;
     on_unload_t on_unload = NULL;
     on_update_t on_update = NULL;
     on_render_t on_render = NULL;
-    on_gui_t on_gui = NULL;
+    on_gui_t    on_gui    = NULL;
+
+    on_play_begin_t on_play_begin = NULL;
+    on_play_stop_t  on_play_stop  = NULL;
+
+    save_to_disk_t   save_to_disk   = NULL;
+    load_from_disk_t load_from_disk = NULL;
 
     init_t init = NULL;
     get_component_info_t get_component_info = NULL;
-    get_component_ids_t get_component_ids = NULL;
-    create_component_t create_component = NULL;
-    get_component_t get_component = NULL;
-    remove_component_t remove_component = NULL;
-    get_component_id_t get_component_id = NULL;
+    get_component_ids_t  get_component_ids  = NULL;
+    create_component_t   create_component   = NULL;
+    get_component_t      get_component      = NULL;
+    remove_component_t   remove_component   = NULL;
+    get_component_id_t   get_component_id   = NULL;
+
+    bool is_loaded = false;
 
     _request_t _request = NULL;
 
@@ -47,7 +61,12 @@ struct Module {
         if (this->_request) {
             return (type_t)_request(ud);
         }
-        return 0;
+        if constexpr (!std::is_same<type_t, void>())
+            return 0;
+    }
+
+    inline bool has_component(uintptr_t comp_id, entt::registry& reg, entt::entity entity) {
+        return this->get_component(comp_id, reg, entity) != NULL;
     }
 
     bool load();

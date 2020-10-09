@@ -13,26 +13,26 @@ template <typename type_t>
 void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
     ImGui::SetCurrentContext(ctx);
 
-    std::string label = name + "##" + std::to_string((uintptr_t)data);
+    std::string label = name;
 
     if constexpr (std::is_same<type_t, bool>()) {
-        ImGui::Checkbox(label.c_str(), data);
+        ImGui::RCheckbox(label.c_str(), data);
     } else if constexpr (std::is_integral<type_t>()) {
-        ImGui::InputInt(label.c_str(), (s32*)data);
+        ImGui::RDragInt(label.c_str(), (s32*)data, .1f);
     } else if constexpr (std::is_same<type_t, mz::ivec2>()) {
-        ImGui::InputInt2(label.c_str(), (s32*)data);
+        ImGui::RDragInt2(label.c_str(), (s32*)data, .1f);
     } else if constexpr (std::is_same<type_t, mz::ivec3>()) {
-        ImGui::InputInt3(label.c_str(), (s32*)data);
+        ImGui::RDragInt3(label.c_str(), (s32*)data, .1f);
     } else if constexpr (std::is_same<type_t, mz::ivec4>()) {
-        ImGui::InputInt4(label.c_str(), (s32*)data);
+        ImGui::RDragInt4(label.c_str(), (s32*)data, .1f);
     } else if constexpr (std::is_same<type_t, f32>()) {
-        ImGui::InputFloat(label.c_str(), data, 0.1f, 0.2f, 5);
+        ImGui::RDragFloat(label.c_str(), (f32*)data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec2>()) {
-        ImGui::InputFloat2(label.c_str(), (f32*)data, 5);
+        ImGui::RDragFloat2(label.c_str(), (f32*)data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec3>()) {
-        ImGui::InputFloat3(label.c_str(), (f32*)data, 5);
+        ImGui::RDragFloat3(label.c_str(), (f32*)data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec4>()) {
-        ImGui::InputFloat4(label.c_str(), (f32*)data, 5);
+        ImGui::RDragFloat4(label.c_str(), (f32*)data, 0.1f);
     } else {
         ImGui::Text("%s N/A", label.c_str());
     }
@@ -68,7 +68,10 @@ extern "C" {
 	}
 
     __declspec(dllexport) uintptr_t __cdecl get_component_id(const std::string& name) {
-        return name_id_map[name];
+        if (name_id_map.find(name) != name_id_map.end())
+            return name_id_map[name];
+        else
+            return 0;
     }
 
 }

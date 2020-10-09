@@ -37,6 +37,7 @@ includedirs {
     "deps/spdlog/include",
     "deps/stb_image",
     "deps/entt/single_include",
+    "deps/box2d/include",
     "deps",
     "%{wks.location}/",
     "%{prj.location}",
@@ -45,7 +46,8 @@ includedirs {
 
 links {
     "apparatus",
-    "imgui"
+    "imgui",
+    "box2d"
 }
 
 filter "system:windows"

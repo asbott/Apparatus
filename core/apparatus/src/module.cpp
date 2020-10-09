@@ -32,6 +32,12 @@ bool Module::load() {
     _mod_load_fn(on_render);
     _mod_load_fn(on_gui);
 
+    _mod_load_fn(on_play_begin);
+    _mod_load_fn(on_play_stop);
+
+    _mod_load_fn(save_to_disk);
+    _mod_load_fn(load_from_disk);
+
     _mod_load_fn(init);
     _mod_load_fn(get_component_info);
     _mod_load_fn(get_component_ids);
@@ -42,12 +48,32 @@ bool Module::load() {
 
     _mod_load_fn(_request);
 
+    is_loaded = true;
     return true;
 }
 
 bool Module::unload() {
     if (!os_mod) return false;
     os::free_module(os_mod);
+
+    on_load = NULL;
+    on_unload = NULL;
+    on_update = NULL;
+    on_render = NULL;
+    on_gui = NULL;
+    on_play_begin = NULL;
+    on_play_stop = NULL;
+    save_to_disk = NULL;
+    load_from_disk = NULL;
+    init = NULL;
+    get_component_info = NULL;
+    get_component_ids = NULL;
+    create_component = NULL;
+    get_component = NULL;
+    remove_component = NULL;
+    get_component_id = NULL;
+    
+    is_loaded = false;
     return true;
 }
 

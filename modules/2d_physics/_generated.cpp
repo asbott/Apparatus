@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/ecs_2d_renderer/ecs_2d_renderer.h"
+#include "D:/dev/Apparatus/modules/2d_physics/2d_physics.h"
 
 #include <vector>
 #include <functional>
@@ -45,146 +45,128 @@ extern "C" {
 	__declspec(dllexport) void __cdecl init() {
 
         {
-            uintptr_t id = (uintptr_t)typeid(Transform2D).name();
+            uintptr_t id = (uintptr_t)typeid(PhysicsBody2D).name();
             runtime_ids.emplace(id);
-            name_id_map["Transform2D"] = id;
+            name_id_map["PhysicsBody2D"] = id;
             component_info[id] = {
                 [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<Transform2D>(entity);
+                    return &reg.emplace<PhysicsBody2D>(entity);
                 },
                 [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<Transform2D>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<Transform2D>(entity);
+                    if (!reg.has<PhysicsBody2D>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<PhysicsBody2D>(entity);
                 }, 
                 [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<Transform2D>(entity);
+                    reg.remove<PhysicsBody2D>(entity);
                 },
             
-                "Transform2D",
+                "PhysicsBody2D",
                 id,
-                false,
+                true,
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec2>("position", (fvec2*)data, ctx);
+                            ImGui::SetCurrentContext(ctx);
+                            on_gui((PhysicsBody2D*)data, ctx);
                         },
-                        "position",
-                        sizeof(fvec2),
-                        0,
-                    },
-                    Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<f32>("rotation", (f32*)data, ctx);
-                        },
-                        "rotation",
+                        "friction",
                         sizeof(f32),
-                        sizeof(fvec2),
-                    },
-                    Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec2>("scale", (fvec2*)data, ctx);
-                        },
-                        "scale",
-                        sizeof(fvec2),
-                        sizeof(fvec2)+sizeof(f32),
-                    },
-                }
-            };
-        }
-        {
-            uintptr_t id = (uintptr_t)typeid(Sprite2D).name();
-            runtime_ids.emplace(id);
-            name_id_map["Sprite2D"] = id;
-            component_info[id] = {
-                [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<Sprite2D>(entity);
-                },
-                [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<Sprite2D>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<Sprite2D>(entity);
-                }, 
-                [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<Sprite2D>(entity);
-                },
-            
-                "Sprite2D",
-                id,
-                false,
-                std::vector<Property_Info> {
-                    Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            (void)data;
-                            ImGui::SetCurrentContext(ctx);
-                            Asset_Request_View view_request;
-                            view_request.asset_id = *(asset_id_t*)data;
-                            Asset* asset_view = get_module("asset_manager")->request<Asset*>(&view_request);
-                            char na[] = "<none>";
-                            if (asset_view) ImGui::RInputText("texture", asset_view->file_name, strlen(asset_view->file_name));
-                            else ImGui::RInputText("texture", na, strlen(na));
-                            if (ImGui::BeginDragDropTarget()) {
-                                auto* p = ImGui::AcceptDragDropPayload("asset");
-                                if (p) {
-                                    auto payload = (Gui_Payload*)p->Data;
-                                    auto new_id = (asset_id_t)(uintptr_t)payload->value;
-                                    view_request.asset_id = new_id;
-                                    asset_view = get_module("asset_manager")->request<Asset*>(&view_request);
-                                    if (asset_view && asset_view->asset_type == ASSET_TYPE_TEXTURE) memcpy(data, &new_id, sizeof(asset_id_t));
-                                }
-                            ImGui::EndDragDropTarget();
-                            }
-                        },
-                        "texture",
-                        sizeof(asset_id_t),
                         0,
                     },
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
                             ImGui::SetCurrentContext(ctx);
-                            ImGui::RColorEdit4("tint", (f32*)data);
+                            on_gui((PhysicsBody2D*)data, ctx);
                         },
-                        "tint",
-                        sizeof(color),
-                        sizeof(asset_id_t),
+                        "density",
+                        sizeof(f32),
+                        sizeof(f32),
                     },
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec2>("origin", (fvec2*)data, ctx);
+                            ImGui::SetCurrentContext(ctx);
+                            on_gui((PhysicsBody2D*)data, ctx);
                         },
-                        "origin",
+                        "restitution",
+                        sizeof(f32),
+                        sizeof(f32)+sizeof(f32),
+                    },
+                    Property_Info { 
+                        [](void* data, ImGuiContext* ctx) {
+                            ImGui::SetCurrentContext(ctx);
+                            on_gui((PhysicsBody2D*)data, ctx);
+                        },
+                        "velocity",
                         sizeof(fvec2),
-                        sizeof(asset_id_t)+sizeof(color),
+                        sizeof(f32)+sizeof(f32)+sizeof(f32),
+                    },
+                    Property_Info { 
+                        [](void* data, ImGuiContext* ctx) {
+                            ImGui::SetCurrentContext(ctx);
+                            on_gui((PhysicsBody2D*)data, ctx);
+                        },
+                        "body_type",
+                        sizeof(Physics_Body_Type),
+                        sizeof(f32)+sizeof(f32)+sizeof(f32)+sizeof(fvec2),
                     },
                 }
             };
         }
         {
-            uintptr_t id = (uintptr_t)typeid(View2D).name();
+            uintptr_t id = (uintptr_t)typeid(CollisionShape2D).name();
             runtime_ids.emplace(id);
-            name_id_map["View2D"] = id;
+            name_id_map["CollisionShape2D"] = id;
             component_info[id] = {
                 [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<View2D>(entity);
+                    return &reg.emplace<CollisionShape2D>(entity);
                 },
                 [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<View2D>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<View2D>(entity);
+                    if (!reg.has<CollisionShape2D>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<CollisionShape2D>(entity);
                 }, 
                 [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<View2D>(entity);
+                    reg.remove<CollisionShape2D>(entity);
                 },
             
-                "View2D",
+                "CollisionShape2D",
                 id,
-                false,
+                true,
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data, ImGuiContext* ctx) {
                             ImGui::SetCurrentContext(ctx);
-                            ImGui::RColorEdit4("clear_color", (f32*)data);
+                            on_gui((CollisionShape2D*)data, ctx);
                         },
-                        "clear_color",
-                        sizeof(color16),
+                        "offset",
+                        sizeof(fvec2),
                         0,
+                    },
+                    Property_Info { 
+                        [](void* data, ImGuiContext* ctx) {
+                            ImGui::SetCurrentContext(ctx);
+                            on_gui((CollisionShape2D*)data, ctx);
+                        },
+                        "is_trigger",
+                        sizeof(bool),
+                        sizeof(fvec2),
+                    },
+                    Property_Info { 
+                        [](void* data, ImGuiContext* ctx) {
+                            ImGui::SetCurrentContext(ctx);
+                            on_gui((CollisionShape2D*)data, ctx);
+                        },
+                        "half_extents",
+                        sizeof(fvec2),
+                        sizeof(fvec2)+sizeof(bool),
+                    },
+                    Property_Info { 
+                        [](void* data, ImGuiContext* ctx) {
+                            ImGui::SetCurrentContext(ctx);
+                            on_gui((CollisionShape2D*)data, ctx);
+                        },
+                        "shape_type",
+                        sizeof(Collision_Shape_Type_2D),
+                        sizeof(fvec2)+sizeof(bool)+sizeof(fvec2),
                     },
                 }
             };

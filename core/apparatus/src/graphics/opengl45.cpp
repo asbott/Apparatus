@@ -335,22 +335,46 @@ void OpenGL45::init(bool show_window) {
         });
     };
     _windows_context.__is_key_down = [this](void* wnd, input_code_t code) {
-        bool ret = false;
-        _api->_thread_server->queue_task(_api->_tid, [&ret, wnd, code]() { ret = glfwGetKey((GLFWwindow*)wnd, (int)code) == GLFW_PRESS; });
-        _api->_thread_server->wait_for_thread(_api->_tid);
-        return ret;
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
+        auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer((GLFWwindow*)wnd);
+        auto& info = windows_context->window_info[wnd];
+
+        std::lock_guard<std::mutex> l(info._input_mutex);
+        return info._input.keys_down[code];
+    };
+    _windows_context.__is_key_pressed = [this](void* wnd, input_code_t code) {
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
+        auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer((GLFWwindow*)wnd);
+        auto& info = windows_context->window_info[wnd];
+
+        std::lock_guard<std::mutex> l(info._input_mutex);
+        return info._input.keys_press[code];
     };
     _windows_context.__get_mouse_position = [this](void* wnd) {
-        mz::ivec2 ret = 0;
-        _api->_thread_server->queue_task(_api->_tid, [&ret, wnd]() {
-            mz::dvec2 mouse_pos;
-            glfwGetCursorPos((GLFWwindow*)wnd, &mouse_pos.x, &mouse_pos.y);
-            ret = (mz::ivec2)mouse_pos;    
-        });
-        _api->_thread_server->wait_for_thread(_api->_tid);
-        return ret; 
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
+        auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer((GLFWwindow*)wnd);
+        auto& info = windows_context->window_info[wnd];
+
+        std::lock_guard<std::mutex> l(info._input_mutex);
+        return info._input.mouse_pos;
         
     }; 
+    _windows_context.__is_mouse_down = [this](void* wnd, input_code_t code) {
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
+        auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer((GLFWwindow*)wnd);
+        auto& info = windows_context->window_info[wnd];
+
+        std::lock_guard<std::mutex> l(info._input_mutex);
+        return info._input.mouse_down[code];
+    };
+    _windows_context.__is_mouse_pressed = [this](void* wnd, input_code_t code) {
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
+        auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer((GLFWwindow*)wnd);
+        auto& info = windows_context->window_info[wnd];
+
+        std::lock_guard<std::mutex> l(info._input_mutex);
+        return info._input.mouse_press[code];
+    };
     _windows_context.__set_vsync = [this](void* wnd, bool value) {
         _api->_thread_server->queue_task(_api->_tid, [this, wnd, value]() {
             glfwMakeContextCurrent((GLFWwindow*)wnd);
@@ -372,6 +396,7 @@ void OpenGL45::init(bool show_window) {
     }; 
 
     glfwSetWindowSizeCallback(main_window, [](GLFWwindow* wnd, int x, int y) {
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
         auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer(wnd);
 
         windows_context->window_info[wnd].size = { x, y };
@@ -380,9 +405,43 @@ void OpenGL45::init(bool show_window) {
     });
 
     glfwSetWindowPosCallback(main_window, [](GLFWwindow* wnd, int x, int y) {
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
         auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer(wnd);
 
         windows_context->window_info[wnd].pos = { x, y };
+    });
+
+    glfwSetKeyCallback(main_window, [](GLFWwindow* wnd, int code, int scancode, int state, int mods) {
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
+        (void)scancode;(void)mods;
+        auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer(wnd);
+
+        auto& input = windows_context->window_info[wnd]._input;
+
+        bool is_now_down = state == GLFW_PRESS;
+        input.keys_press[code] = is_now_down && !input.keys_down[code];
+        input.keys_down[code] = is_now_down;
+    });
+
+    glfwSetMouseButtonCallback(main_window, [](GLFWwindow* wnd, int code, int state, int mods) {
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
+        (void)mods;
+        auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer(wnd);
+
+        auto& input = windows_context->window_info[wnd]._input;
+
+        bool is_now_down = state == GLFW_PRESS;
+        input.mouse_press[code] = is_now_down && !input.mouse_down[code];
+        input.mouse_down[code] = is_now_down;
+    });
+
+    glfwSetCursorPosCallback(main_window, [](GLFWwindow* wnd, double x, double y){
+        glfwMakeContextCurrent((GLFWwindow*)wnd);
+        auto* windows_context = (Windows_Context*)glfwGetWindowUserPointer(wnd);
+
+        auto& input = windows_context->window_info[wnd]._input;
+
+        input.mouse_pos = mz::fvec2((f32)x, (f32)y);
     });
 
     _windows_context.set_vsync(main_window, false);
@@ -413,12 +472,164 @@ void OpenGL45::init(bool show_window) {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    ImGui::StyleColorsDark();
+    ImGuiStyle& style = ImGui::GetStyle();
 
-    auto& style = ImGui::GetStyle();
+    //ImGui::StyleColorsDark();
+    /*style.Colors[ImGuiCol_Text] = ImVec4(0.31f, 0.25f, 0.24f, 1.00f);
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.94f, 0.94f, 0.94f, 1.00f);
+    style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.74f, 0.74f, 0.94f, 1.00f);
+    style.Colors[ImGuiCol_ChildBg] = ImVec4(0.68f, 0.68f, 0.68f, 0.00f);
+    style.Colors[ImGuiCol_Border] = ImVec4(0.50f, 0.50f, 0.50f, 0.60f);
+    style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.62f, 0.70f, 0.72f, 0.56f);
+    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.95f, 0.33f, 0.14f, 0.47f);
+    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.97f, 0.31f, 0.13f, 0.81f);
+    style.Colors[ImGuiCol_TitleBg] = ImVec4(0.42f, 0.75f, 1.00f, 0.53f);
+    style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.40f, 0.65f, 0.80f, 0.20f);
+    style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.40f, 0.62f, 0.80f, 0.15f);
+    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.39f, 0.64f, 0.80f, 0.30f);
+    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.28f, 0.67f, 0.80f, 0.59f);
+    style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.25f, 0.48f, 0.53f, 0.67f);
+    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.48f, 0.47f, 0.47f, 0.71f);
+    style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.31f, 0.47f, 0.99f, 1.00f);
+    style.Colors[ImGuiCol_Button] = ImVec4(1.00f, 0.79f, 0.18f, 0.78f);
+    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.42f, 0.82f, 1.00f, 0.81f);
+    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.72f, 1.00f, 1.00f, 0.86f);
+    style.Colors[ImGuiCol_Header] = ImVec4(0.65f, 0.78f, 0.84f, 0.80f);
+    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.75f, 0.88f, 0.94f, 0.80f);
+    style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.55f, 0.68f, 0.74f, 0.80f);//ImVec4(0.46f, 0.84f, 0.90f, 1.00f);
+    style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.60f, 0.60f, 0.80f, 0.30f);
+    style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(1.00f, 1.00f, 1.00f, 0.60f);
+    style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(1.00f, 1.00f, 1.00f, 0.90f);
+    style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(1.00f, 0.99f, 0.54f, 0.43f);
+    style.Alpha = 1.0f;
+    style.FrameRounding = 4;
+    style.IndentSpacing = 12.0f;*/
 
-    style.WindowRounding = 0.f;
-    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    /*style.WindowRounding = 5.3f;
+    style.GrabRounding = style.FrameRounding = 2.3f;
+    style.ScrollbarRounding = 5.0f;
+    style.FrameBorderSize = 1.0f;
+    style.ItemSpacing.y = 6.5f;
+
+    style.Colors[ImGuiCol_Text]                  = {0.73333335f, 0.73333335f, 0.73333335f, 1.00f};
+    style.Colors[ImGuiCol_TextDisabled]          = {0.34509805f, 0.34509805f, 0.34509805f, 1.00f};
+    style.Colors[ImGuiCol_WindowBg]              = {0.23529413f, 0.24705884f, 0.25490198f, 0.94f};
+    style.Colors[ImGuiCol_ChildBg]               = {0.23529413f, 0.24705884f, 0.25490198f, 0.00f};
+    style.Colors[ImGuiCol_PopupBg]               = {0.23529413f, 0.24705884f, 0.25490198f, 0.94f};
+    style.Colors[ImGuiCol_Border]                = {0.33333334f, 0.33333334f, 0.33333334f, 0.50f};
+    style.Colors[ImGuiCol_BorderShadow]          = {0.15686275f, 0.15686275f, 0.15686275f, 0.00f};
+    style.Colors[ImGuiCol_FrameBg]               = {0.16862746f, 0.16862746f, 0.16862746f, 0.54f};
+    style.Colors[ImGuiCol_FrameBgHovered]        = {0.453125f, 0.67578125f, 0.99609375f, 0.67f};
+    style.Colors[ImGuiCol_FrameBgActive]         = {0.47058827f, 0.47058827f, 0.47058827f, 0.67f};
+    style.Colors[ImGuiCol_Tab]                   = {0.16f, 0.29f, 0.48f, 1.00f};
+    style.Colors[ImGuiCol_TabActive]             = {0.36f, 0.49f, 0.68f, 1.00f};
+    style.Colors[ImGuiCol_TabHovered]            = {0.26f, 0.39f, 0.58f, 1.00f};
+    style.Colors[ImGuiCol_TabUnfocused]          = {0.06f, 0.39f, 0.38f, 1.00f};
+    style.Colors[ImGuiCol_TabUnfocusedActive]    = {0.46f, 0.59f, 0.58f, 1.00f};
+    style.Colors[ImGuiCol_TitleBg]               = {0.04f, 0.04f, 0.04f, 1.00f};
+    style.Colors[ImGuiCol_TitleBgCollapsed]      = {0.16f, 0.29f, 0.48f, 1.00f};
+    style.Colors[ImGuiCol_TitleBgActive]         = {0.00f, 0.00f, 0.00f, 0.51f};
+    style.Colors[ImGuiCol_MenuBarBg]             = {0.27058825f, 0.28627452f, 0.2901961f, 0.80f};
+    style.Colors[ImGuiCol_ScrollbarBg]           = {0.27058825f, 0.28627452f, 0.2901961f, 0.60f};
+    style.Colors[ImGuiCol_ScrollbarGrab]         = {0.21960786f, 0.30980393f, 0.41960788f, 0.51f};
+    style.Colors[ImGuiCol_ScrollbarGrabHovered]  = {0.21960786f, 0.30980393f, 0.41960788f, 1.00f};
+    style.Colors[ImGuiCol_ScrollbarGrabActive]   = {0.13725491f, 0.19215688f, 0.2627451f, 0.91f};
+    style.Colors[ImGuiCol_CheckMark]             = {0.90f, 0.90f, 0.90f, 0.83f};
+    style.Colors[ImGuiCol_SliderGrab]            = {0.70f, 0.70f, 0.70f, 0.62f};
+    style.Colors[ImGuiCol_SliderGrabActive]      = {0.30f, 0.30f, 0.30f, 0.84f};
+    style.Colors[ImGuiCol_Button]                = {0.33333334f, 0.3529412f, 0.36078432f, 0.49f};
+    style.Colors[ImGuiCol_ButtonHovered]         = {0.21960786f, 0.30980393f, 0.41960788f, 1.00f};
+    style.Colors[ImGuiCol_ButtonActive]          = {0.13725491f, 0.19215688f, 0.2627451f, 1.00f};
+    style.Colors[ImGuiCol_Header]                = {0.33333334f, 0.3529412f, 0.36078432f, 0.53f};
+    style.Colors[ImGuiCol_HeaderHovered]         = {0.453125f, 0.67578125f, 0.99609375f, 0.67f};
+    style.Colors[ImGuiCol_HeaderActive]          = {0.47058827f, 0.47058827f, 0.47058827f, 0.67f};
+    style.Colors[ImGuiCol_Separator]             = {0.31640625f, 0.31640625f, 0.31640625f, 1.00f};
+    style.Colors[ImGuiCol_SeparatorHovered]      = {0.31640625f, 0.31640625f, 0.31640625f, 1.00f};
+    style.Colors[ImGuiCol_SeparatorActive]       = {0.31640625f, 0.31640625f, 0.31640625f, 1.00f};
+    style.Colors[ImGuiCol_ResizeGrip]            = {1.00f, 1.00f, 1.00f, 0.85f};
+    style.Colors[ImGuiCol_ResizeGripHovered]     = {1.00f, 1.00f, 1.00f, 0.60f};
+    style.Colors[ImGuiCol_ResizeGripActive]      = {1.00f, 1.00f, 1.00f, 0.90f};
+    style.Colors[ImGuiCol_PlotLines]             = {0.61f, 0.61f, 0.61f, 1.00f};
+    style.Colors[ImGuiCol_PlotLinesHovered]      = {1.00f, 0.43f, 0.35f, 1.00f};
+    style.Colors[ImGuiCol_PlotHistogram]         = {0.90f, 0.70f, 0.00f, 1.00f};
+    style.Colors[ImGuiCol_PlotHistogramHovered]  = {1.00f, 0.60f, 0.00f, 1.00f};
+    style.Colors[ImGuiCol_TextSelectedBg]        = {0.18431373f, 0.39607847f, 0.79215693f, 0.90f};*/
+
+    constexpr auto ColorFromBytes = [](uint8_t r, uint8_t g, uint8_t b)
+    {
+        return ImVec4((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, 1.0f);
+    };
+
+    ImVec4* colors = style.Colors;
+
+    const ImVec4 bgColor           = ColorFromBytes(37, 37, 38);
+    const ImVec4 lightBgColor      = ColorFromBytes(82, 82, 85);
+    const ImVec4 veryLightBgColor  = ColorFromBytes(90, 90, 95);
+
+    const ImVec4 panelColor        = ColorFromBytes(51, 51, 55);
+    const ImVec4 panelHoverColor   = ColorFromBytes(29, 151, 236);
+    const ImVec4 panelActiveColor  = ColorFromBytes(0, 119, 200);
+
+    const ImVec4 textColor         = ColorFromBytes(255, 255, 255);
+    const ImVec4 textDisabledColor = ColorFromBytes(151, 151, 151);
+    const ImVec4 borderColor       = ColorFromBytes(78, 78, 78);
+
+    colors[ImGuiCol_Text]                 = textColor;
+    colors[ImGuiCol_TextDisabled]         = textDisabledColor;
+    colors[ImGuiCol_TextSelectedBg]       = panelActiveColor;
+    colors[ImGuiCol_WindowBg]             = bgColor;
+    colors[ImGuiCol_ChildBg]              = bgColor;
+    colors[ImGuiCol_PopupBg]              = bgColor;
+    colors[ImGuiCol_Border]               = borderColor;
+    colors[ImGuiCol_BorderShadow]         = borderColor;
+    colors[ImGuiCol_FrameBg]              = panelColor;
+    colors[ImGuiCol_FrameBgHovered]       = panelHoverColor;
+    colors[ImGuiCol_FrameBgActive]        = panelActiveColor;
+    colors[ImGuiCol_TitleBg]              = bgColor;
+    colors[ImGuiCol_TitleBgActive]        = bgColor;
+    colors[ImGuiCol_TitleBgCollapsed]     = bgColor;
+    colors[ImGuiCol_MenuBarBg]            = panelColor;
+    colors[ImGuiCol_ScrollbarBg]          = panelColor;
+    colors[ImGuiCol_ScrollbarGrab]        = lightBgColor;
+    colors[ImGuiCol_ScrollbarGrabHovered] = veryLightBgColor;
+    colors[ImGuiCol_ScrollbarGrabActive]  = veryLightBgColor;
+    colors[ImGuiCol_CheckMark]            = panelActiveColor;
+    colors[ImGuiCol_SliderGrab]           = panelHoverColor;
+    colors[ImGuiCol_SliderGrabActive]     = panelActiveColor;
+    colors[ImGuiCol_Button]               = panelColor;
+    colors[ImGuiCol_ButtonHovered]        = panelHoverColor;
+    colors[ImGuiCol_ButtonActive]         = panelHoverColor;
+    colors[ImGuiCol_Header]               = panelColor;
+    colors[ImGuiCol_HeaderHovered]        = panelHoverColor;
+    colors[ImGuiCol_HeaderActive]         = panelActiveColor;
+    colors[ImGuiCol_Separator]            = borderColor;
+    colors[ImGuiCol_SeparatorHovered]     = borderColor;
+    colors[ImGuiCol_SeparatorActive]      = borderColor;
+    colors[ImGuiCol_ResizeGrip]           = bgColor;
+    colors[ImGuiCol_ResizeGripHovered]    = panelColor;
+    colors[ImGuiCol_ResizeGripActive]     = lightBgColor;
+    colors[ImGuiCol_PlotLines]            = panelActiveColor;
+    colors[ImGuiCol_PlotLinesHovered]     = panelHoverColor;
+    colors[ImGuiCol_PlotHistogram]        = panelActiveColor;
+    colors[ImGuiCol_PlotHistogramHovered] = panelHoverColor;
+    colors[ImGuiCol_ModalWindowDarkening] = ImVec4(bgColor.x, bgColor.y, bgColor.z, .5f);
+    colors[ImGuiCol_DragDropTarget]       = bgColor;
+    colors[ImGuiCol_NavHighlight]         = bgColor;
+    colors[ImGuiCol_DockingPreview]       = panelActiveColor;
+    colors[ImGuiCol_Tab]                  = bgColor;
+    colors[ImGuiCol_TabActive]            = panelActiveColor;
+    colors[ImGuiCol_TabUnfocused]         = bgColor;
+    colors[ImGuiCol_TabUnfocusedActive]   = panelActiveColor;
+    colors[ImGuiCol_TabHovered]           = panelHoverColor;
+
+    style.WindowRounding    = 0.0f;
+    style.ChildRounding     = 0.0f;
+    style.FrameRounding     = 0.0f;
+    style.GrabRounding      = 0.0f;
+    style.PopupRounding     = 0.0f;
+    style.ScrollbarRounding = 0.0f;
+    style.TabRounding       = 0.0f;
 
     bool glfw_init_result = ImGui_ImplGlfw_InitForOpenGL(main_window, true);
     ap_assert(glfw_init_result, "Failed to initialize ImGui for glfw");
@@ -427,6 +638,8 @@ void OpenGL45::init(bool show_window) {
     bool opengl_init_result = ImGui_ImplOpenGL3_Init("#version 410");
     ap_assert(opengl_init_result, "Failed to initialize ImGui for OpenGL3");
     (void)opengl_init_result;
+
+    glLineWidth(2);
 }
 
 OpenGL45::~OpenGL45() {
@@ -547,9 +760,6 @@ graphics_id_t OpenGL45::make_shader(graphics_id_t vert_shader, graphics_id_t fra
 
     glValidateProgram(program);
 
-    GLuint ub_index = glGetUniformBlockIndex(program, "UniformBuffer");
-    glUniformBlockBinding(program, ub_index, 0);
-
     static int samplers[32] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 
                                 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
                                 26, 27, 28, 29, 30, 31 };
@@ -628,6 +838,43 @@ graphics_id_t OpenGL45::make_texture(graphics_enum_t usage) {
     return texture;
 }
 
+graphics_id_t OpenGL45::make_render_target(mz::ivec2 size) {
+    graphics_id_t fbo = G_NULL_ID;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    graphics_id_t texture = G_NULL_ID;
+    glGenTextures(1, &texture);
+
+    _render_targets.resize(std::max<graphics_id_t>(fbo + 1, (graphics_id_t)_render_targets.size()));
+
+    _render_targets[fbo].fbo = fbo;
+    _render_targets[fbo].size = size;
+    _render_targets[fbo].texture = texture;
+
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, GL_RGBA, GL_FLOAT, NULL);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        send_message(G_DEBUG_MESSAGE_SEVERITY_CRITICAL, "Failed creating framebuffer");
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    send_message(G_DEBUG_MESSAGE_SEVERITY_NOTIFY, "Created a framebuffer with size { %i, %i } (id %u)", size.x, size.y, fbo);
+
+    return fbo;
+}
+
 void OpenGL45::destroy_vertex_array(graphics_id_t vao) {
     make_context_current();
     glDeleteVertexArrays(1, &vao);
@@ -661,6 +908,13 @@ void OpenGL45::destroy_texture(graphics_id_t texture) {
     make_context_current();
 
     glDeleteTextures(1, &texture);
+}
+
+void OpenGL45::destroy_render_target(graphics_id_t render_target) {
+    auto& fbo_info = _render_targets[render_target];
+    send_message(G_DEBUG_MESSAGE_SEVERITY_NOTIFY, "Destroying render target %u", render_target);
+    glDeleteTextures(1, &fbo_info.texture);
+    glDeleteFramebuffers(1, &fbo_info.fbo);
 }
 
 void OpenGL45::set_texture_data(graphics_id_t texture, byte* data, mz::ivec2 size, graphics_enum_t fmt) {
@@ -719,13 +973,44 @@ void OpenGL45::bind_texture_to_slot(graphics_id_t texture, graphics_enum_t slot)
     glBindTexture(GL_TEXTURE_2D, texture);
 }
 
+void OpenGL45::set_render_target_size(graphics_id_t render_target, mz::ivec2 size) {
+    glBindFramebuffer(GL_FRAMEBUFFER, render_target);
+
+    auto& fbo_info = _render_targets[render_target];
+
+    glBindTexture(GL_TEXTURE_2D, fbo_info.texture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, GL_RGBA, GL_FLOAT, NULL);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        send_message(G_DEBUG_MESSAGE_SEVERITY_CRITICAL, "Failed resizing framebuffer");
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    send_message(G_DEBUG_MESSAGE_SEVERITY_NOTIFY, "Resized a framebuffer to size { %i, %i }", size.x, size.y);
+
+    fbo_info.size = size;
+}
+mz::ivec2 OpenGL45::get_render_target_size(graphics_id_t render_target) {
+    return _render_targets[render_target].size;
+}
+
+graphics_id_t OpenGL45::get_render_target_texture(graphics_id_t render_target) {
+    return _render_targets[render_target].texture;
+}
+
 void* OpenGL45::get_native_texture_handle(graphics_id_t texture) {
     return (void*)(uintptr_t)texture;
 }
 
-void OpenGL45::set_clear_color(mz::color16 color) {
+void OpenGL45::set_clear_color(mz::color16 color, graphics_id_t render_target) {
     make_context_current();
+
+    if (render_target != G_NULL_ID) glBindFramebuffer(GL_FRAMEBUFFER, render_target);
     glClearColor(color.r, color.g, color.b, color.a);    
+    if (render_target != G_NULL_ID) glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void OpenGL45::set_viewport(mz::viewport viewport) {
@@ -733,17 +1018,19 @@ void OpenGL45::set_viewport(mz::viewport viewport) {
     glViewport(viewport.x, viewport.y, viewport.width, viewport.height);
 }
 
-void OpenGL45::clear(graphics_enum_t clear_flags) {
+void OpenGL45::clear(graphics_enum_t clear_flags, graphics_id_t render_target) {
     make_context_current();
     GLbitfield gl_clear_flags = 0; 
     if (clear_flags & G_COLOR_BUFFER_BIT)   gl_clear_flags |= GL_COLOR_BUFFER_BIT;
     if (clear_flags & G_DEPTH_BUFFER_BIT)   gl_clear_flags |= GL_DEPTH_BUFFER_BIT;
     if (clear_flags & G_STENCIL_BUFFER_BIT) gl_clear_flags |= GL_STENCIL_BUFFER_BIT;
 
+    if (render_target != G_NULL_ID) glBindFramebuffer(GL_FRAMEBUFFER, render_target);
     glClear(gl_clear_flags);
+    if (render_target != G_NULL_ID) glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void OpenGL45::draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode) {
+void OpenGL45::draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode, graphics_id_t render_target) {
     make_context_current();
     graphics_id_t ibo = _ibo_associations[vao];
 
@@ -760,9 +1047,16 @@ void OpenGL45::draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_c
 
     if (ubo != G_NULL_ID) {
         glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+        GLuint ub_index = glGetUniformBlockIndex(shader, "UniformBuffer");
+        glUniformBlockBinding(shader, ub_index, 0);
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
     }
 
+    if (render_target != G_NULL_ID) glBindFramebuffer(GL_FRAMEBUFFER, render_target);
+
     glDrawElements(convert_draw_mode(draw_mode), (GLsizei)index_count, GL_UNSIGNED_INT, NULL);
+
+    if (render_target != G_NULL_ID) glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     if (ubo != G_NULL_ID) {
         glBindBuffer(GL_UNIFORM_BUFFER, 0);

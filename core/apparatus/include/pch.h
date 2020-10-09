@@ -4,9 +4,13 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include <functional>
 #include <optional>
+#include <variant>
+#include <sstream>
+#include <fstream>
 
 #include <spdlog/fmt/ostr.h>
 
@@ -14,6 +18,7 @@
 
 #include <mz_vector.hpp>
 #include <mz_matrix.hpp>
+#include <mz_algorithms.hpp>
 
 #include "constant_limits.h"
 
@@ -21,9 +26,9 @@
 
 #include "base_types.h"
 
-#include "logger.h"
-
 #include "containers.h"
+
+#include "logger.h"
 
 #include "file_management.h"
 

@@ -2,15 +2,15 @@
 
 #define IM_VEC2_CLASS_EXTRA                                                 \
         template <typename value_t>\
-        ImVec2(const mz::vec2<value_t>& f) { x = f.x; y = f.y; }                       \
+        ImVec2(const mz::vec2<value_t>& f) { x = (f32)f.x; y = (f32)f.y; }                       \
         template <typename value_t>\
-        operator mz::vec2<value_t>() const { return mz::vec2<value_t>(x,y); }
+        operator mz::vec2<value_t>() const { return mz::vec2<value_t>((value_t)x,(value_t)y); }
 
 #define IM_VEC4_CLASS_EXTRA                                                 \
         template <typename value_t>\
-        ImVec4(const mz::vec4<value_t>& f) { x = f.x; y = f.y; z = f.z; w = f.w; }     \
+        ImVec4(const mz::vec4<value_t>& f) { x = (f32)f.x; y = (f32)f.y; z = (f32)f.z; w = (f32)f.w; }     \
         template <typename value_t>\
-        operator mz::vec4<value_t>() const { return mz::vec4<value_t>(x,y,z,w); }
+        operator mz::vec4<value_t>() const { return mz::vec4<value_t>((value_t)x,(value_t)y,(value_t)z,(value_t)w); }
 
 #include <imgui.h>
 
@@ -28,13 +28,42 @@ typedef u32 graphics_id_t;
 #undef max
 constexpr graphics_id_t G_NULL_ID = std::numeric_limits<graphics_id_t>::max();
 
+struct Input_State {
+	bool keys_down[AP_KEY_COUNT];
+	bool keys_press[AP_KEY_COUNT];
+
+	bool mouse_down[AP_MOUSE_BUTTON_COUNT];
+	bool mouse_press[AP_MOUSE_BUTTON_COUNT];
+
+	mz::fvec2 mouse_pos;
+};
+
 struct Window_Info {
+    Window_Info() {}
+    Window_Info(const Window_Info& src)
+        : size(src.size), pos(src.pos), title(src.title), delta_time(src.delta_time),
+          _last_time(src._last_time), is_vsync_on(src.is_vsync_on), _input(src._input)  { }
+
+    Window_Info& operator =(const Window_Info& src) {
+        size = src.size;
+        pos = src.pos;
+        title = src.title;
+        delta_time = src.delta_time;
+        _last_time = src._last_time;
+        is_vsync_on = src.is_vsync_on;
+        _input = src._input;
+        return *this;
+    }
+
     mz::ivec2 size;
     mz::ivec2 pos;
     const char* title;
     f64 delta_time = 0;
     f64 _last_time = 0;
     bool is_vsync_on;
+    Input_State _input;
+
+    std::mutex _input_mutex;
 };
 
 struct Windows_Context {
@@ -51,6 +80,8 @@ struct Windows_Context {
 
     std::function<bool(void* wnd, input_code_t k)> __is_key_down;
     _ap_force_inline bool is_key_down(void* wnd, input_code_t k) { return __is_key_down(wnd, k); }
+    std::function<bool(void* wnd, input_code_t k)> __is_key_pressed;
+    _ap_force_inline bool is_key_pressed(void* wnd, input_code_t k) { return __is_key_pressed(wnd, k); }
 
     std::function<mz::ivec2(void* wnd)> __get_mouse_position;
     _ap_force_inline mz::ivec2 get_mouse_position(void* wnd) { return __get_mouse_position(wnd); }
@@ -63,6 +94,11 @@ struct Windows_Context {
 
     std::function<void(void* wnd)> __show_window;
     _ap_force_inline void show_window(void* wnd) { __show_window(wnd); }
+
+    std::function<bool(void* wnd, input_code_t m)> __is_mouse_down;
+    _ap_force_inline bool is_mouse_down(void* wnd, input_code_t m) { return __is_mouse_down(wnd, m); }
+    std::function<bool(void* wnd, input_code_t m)> __is_mouse_pressed;
+    _ap_force_inline bool is_mouse_pressed(void* wnd, input_code_t m) { return __is_mouse_pressed(wnd, m); }
 };
 
 struct Buffer_Layout_Specification {
@@ -132,6 +168,7 @@ struct AP_API Graphics_Context {
     virtual graphics_id_t make_index_buffer(u32* indices, count_t count, graphics_enum_t usage) = 0;
     virtual graphics_id_t make_uniform_buffer(void* data, const Buffer_Layout_Specification& layout, graphics_enum_t usage) = 0;
     virtual graphics_id_t make_texture(graphics_enum_t usage) = 0;
+    virtual graphics_id_t make_render_target(mz::ivec2 size) = 0;
 
     virtual void destroy_vertex_array(graphics_id_t vao) = 0;
     virtual void destroy_shader(graphics_id_t shader) = 0;
@@ -140,6 +177,7 @@ struct AP_API Graphics_Context {
     virtual void destroy_index_buffer(graphics_id_t ibo) = 0;
     virtual void destroy_uniform_buffer(graphics_id_t ubo) = 0;
     virtual void destroy_texture(graphics_id_t texture) = 0;
+    virtual void destroy_render_target(graphics_id_t render_target) = 0;
 
     virtual void set_texture_data(graphics_id_t texture, byte* data, mz::ivec2 size, graphics_enum_t fmt) = 0;
     virtual void set_texture_wrapping(graphics_id_t texture, graphics_enum_t wrap_mode) = 0;
@@ -148,13 +186,17 @@ struct AP_API Graphics_Context {
     virtual void bind_texture_to_slot(graphics_id_t texture, graphics_enum_t slot) = 0;
     virtual void* get_native_texture_handle(graphics_id_t texture) = 0;
 
-    virtual void set_clear_color(mz::color16 color) = 0;
+    virtual void set_render_target_size(graphics_id_t render_target, mz::ivec2 size) = 0;
+    virtual mz::ivec2 get_render_target_size(graphics_id_t render_target) = 0;
+    virtual graphics_id_t get_render_target_texture(graphics_id_t render_target) = 0;
+
+    virtual void set_clear_color(mz::color16 color, graphics_id_t render_target = G_NULL_ID) = 0;
 
     virtual void set_viewport(mz::viewport viewport) = 0;
 
-    virtual void clear(graphics_enum_t clear_flags) = 0;
+    virtual void clear(graphics_enum_t clear_flags, graphics_id_t render_target = G_NULL_ID) = 0;
 
-    virtual void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo = G_NULL_ID, graphics_enum_t draw_mode = G_DRAW_MODE_TRIANGLES) = 0;
+    virtual void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo = G_NULL_ID, graphics_enum_t draw_mode = G_DRAW_MODE_TRIANGLES, graphics_id_t render_target = G_NULL_ID) = 0;
 
     virtual void associate_vertex_buffer(graphics_id_t vbo, graphics_id_t vao) = 0;
     virtual void associate_index_buffer(graphics_id_t ibo, graphics_id_t vao) = 0;
@@ -263,6 +305,13 @@ struct AP_API Graphics : public Graphics_Context {
         return ret;
     }
 
+    _ap_force_inline graphics_id_t make_render_target(mz::ivec2 size) override {
+        graphics_id_t ret = 0;
+        _thread_server->queue_task(_tid, [this, &ret, size]() { ret = _inst.make_render_target(size); });
+        _thread_server->wait_for_thread(_tid);
+        return ret;
+    }
+
     _ap_force_inline void destroy_vertex_array(graphics_id_t vao) override {
         _thread_server->queue_task(_tid, [this, vao]() { _inst.destroy_vertex_array(vao); });
     }
@@ -283,6 +332,9 @@ struct AP_API Graphics : public Graphics_Context {
     }
     _ap_force_inline void destroy_texture(graphics_id_t texture) override {
         _thread_server->queue_task(_tid, [this, texture]() { _inst.destroy_texture(texture); });
+    }
+    _ap_force_inline void destroy_render_target(graphics_id_t render_target) override {
+        _thread_server->queue_task(_tid, [this, render_target]() { _inst.destroy_render_target(render_target); });
     }
 
     _ap_force_inline void set_texture_data(graphics_id_t texture, byte* data, mz::ivec2 size, graphics_enum_t fmt) override {
@@ -309,20 +361,37 @@ struct AP_API Graphics : public Graphics_Context {
         return ret;
     }
 
-    _ap_force_inline void set_clear_color(mz::color16 color) override {
-        _thread_server->queue_task(_tid, [this, color]() { _inst.set_clear_color(color); });
+    _ap_force_inline void set_render_target_size(graphics_id_t render_target, mz::ivec2 size) {
+        _thread_server->queue_task(_tid, [this, render_target, size]() { _inst.set_render_target_size(render_target, size); });
+    }
+    _ap_force_inline mz::ivec2 get_render_target_size(graphics_id_t render_target) override {
+        mz::ivec2 ret = 0;
+        _thread_server->queue_task(_tid, [this, &ret, render_target]() { ret = _inst.get_render_target_size(render_target); });
+        _thread_server->wait_for_thread(_tid);
+        return ret;
+    }
+
+    _ap_force_inline graphics_id_t get_render_target_texture(graphics_id_t render_target) override {
+        graphics_id_t ret = 0;
+        _thread_server->queue_task(_tid, [this, &ret, render_target]() { ret = _inst.get_render_target_texture(render_target); });
+        _thread_server->wait_for_thread(_tid);
+        return ret;
+    }
+
+    _ap_force_inline void set_clear_color(mz::color16 color, graphics_id_t render_target = G_NULL_ID) override {
+        _thread_server->queue_task(_tid, [this, color, render_target]() { _inst.set_clear_color(color, render_target); });
     }
 
     _ap_force_inline void set_viewport(mz::viewport viewport) override {
         _thread_server->queue_task(_tid, [this, viewport]() { _inst.set_viewport(viewport); });
     }
 
-    _ap_force_inline void clear(graphics_enum_t clear_flags) override {
-        _thread_server->queue_task(_tid, [this, clear_flags]() { _inst.clear(clear_flags); });
+    _ap_force_inline void clear(graphics_enum_t clear_flags, graphics_id_t render_target = G_NULL_ID) override {
+        _thread_server->queue_task(_tid, [this, clear_flags, render_target]() { _inst.clear(clear_flags, render_target); });
     }
 
-    _ap_force_inline void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode = G_DRAW_MODE_TRIANGLES) override {
-        _thread_server->queue_task(_tid, [this, vao, shader, index_count, ubo, draw_mode]() { _inst.draw_indices(vao, shader, index_count, ubo, draw_mode); });
+    _ap_force_inline void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode = G_DRAW_MODE_TRIANGLES, graphics_id_t render_target = G_NULL_ID) override {
+        _thread_server->queue_task(_tid, [this, vao, shader, index_count, ubo, draw_mode, render_target]() { _inst.draw_indices(vao, shader, index_count, ubo, draw_mode, render_target); });
     }
 
     _ap_force_inline void associate_vertex_buffer(graphics_id_t vbo, graphics_id_t vao) override {
@@ -343,32 +412,32 @@ struct AP_API Graphics : public Graphics_Context {
         _thread_server->queue_task(_tid, [this, ubo, name, data]() { _inst.set_uniform_buffer_data(ubo, name, data); });
     }
 
-    inline void* map_vertex_buffer_data(graphics_id_t vbo) override {
+    _ap_force_inline void* map_vertex_buffer_data(graphics_id_t vbo) override {
         void* ret = 0;
         _thread_server->queue_task(_tid, [this, &ret, vbo]() { ret = _inst.map_vertex_buffer_data(vbo); });
         _thread_server->wait_for_thread(_tid);
         return ret;
     }
-    inline u32* map_index_buffer_data(graphics_id_t ibo) override {
+    _ap_force_inline u32* map_index_buffer_data(graphics_id_t ibo) override {
         u32* ret = 0;
         _thread_server->queue_task(_tid, [this, &ret, ibo]() { ret = _inst.map_index_buffer_data(ibo); });
         _thread_server->wait_for_thread(_tid);
         return ret;
     }
-    inline void* map_uniform_buffer_data(graphics_id_t ubo) override {
+    _ap_force_inline void* map_uniform_buffer_data(graphics_id_t ubo) override {
         void* ret = 0;
         _thread_server->queue_task(_tid, [this, &ret, ubo]() { ret = _inst.map_uniform_buffer_data(ubo); });
         _thread_server->wait_for_thread(_tid);
         return ret;
     }
 
-    inline void unmap_vertex_buffer_data(graphics_id_t vbo) override {
+    _ap_force_inline void unmap_vertex_buffer_data(graphics_id_t vbo) override {
         _thread_server->queue_task(_tid, [this, vbo]() { _inst.unmap_vertex_buffer_data(vbo); });
     }
-    inline void unmap_index_buffer_data(graphics_id_t ibo) override {
+    _ap_force_inline void unmap_index_buffer_data(graphics_id_t ibo) override {
         _thread_server->queue_task(_tid, [this, ibo]() { _inst.unmap_index_buffer_data(ibo); });
     }
-    inline void unmap_uniform_buffer_data(graphics_id_t ubo) override {
+    _ap_force_inline void unmap_uniform_buffer_data(graphics_id_t ubo) override {
         _thread_server->queue_task(_tid, [this, ubo]() { _inst.unmap_uniform_buffer_data(ubo); });
     }
 
@@ -418,6 +487,7 @@ graphics_id_t make_vertex_buffer(void* data, size_t sz, graphics_enum_t usage);\
 graphics_id_t make_index_buffer(u32* indices, count_t count, graphics_enum_t usage);\
 graphics_id_t make_uniform_buffer(void* data, const Buffer_Layout_Specification& layout, graphics_enum_t usage);\
 graphics_id_t make_texture(graphics_enum_t usage);\
+graphics_id_t make_render_target(mz::ivec2 size);\
 void destroy_vertex_array(graphics_id_t vao);\
 void destroy_shader(graphics_id_t shader);\
 void destroy_shader_source(graphics_id_t shader_source);\
@@ -425,16 +495,20 @@ void destroy_vertex_buffer(graphics_id_t vbo);\
 void destroy_index_buffer(graphics_id_t ibo);\
 void destroy_uniform_buffer(graphics_id_t ubo);\
 void destroy_texture(graphics_id_t texture);\
+void destroy_render_target(graphics_id_t render_target);\
 void set_texture_data(graphics_id_t texture, byte* data, mz::ivec2 size, graphics_enum_t fmt);\
 void set_texture_wrapping(graphics_id_t texture, graphics_enum_t wrap_mode);\
 void set_texture_filtering(graphics_id_t texture, graphics_enum_t min_filter_mode, graphics_enum_t mag_filter_mode);\
 void set_texture_multisampling(graphics_id_t texture, u32 count, u32 quality);\
 void bind_texture_to_slot(graphics_id_t texture, graphics_enum_t slot);\
 void* get_native_texture_handle(graphics_id_t texture);\
-void set_clear_color(mz::color16 color);\
+void set_render_target_size(graphics_id_t render_target, mz::ivec2 size);\
+mz::ivec2 get_render_target_size(graphics_id_t render_target);\
+graphics_id_t get_render_target_texture(graphics_id_t render_target);\
+void set_clear_color(mz::color16 color, graphics_id_t render_target);\
 void set_viewport(mz::viewport viewport);\
-void clear(graphics_enum_t clear_flags);\
-void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode);\
+void clear(graphics_enum_t clear_flags, graphics_id_t render_target);\
+void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode, graphics_id_t render_target);\
 void associate_vertex_buffer(graphics_id_t vbo, graphics_id_t vao);\
 void associate_index_buffer(graphics_id_t ibo, graphics_id_t vao);\
 void set_vertex_buffer_data(graphics_id_t vbo, void* data, size_t offset, size_t sz);\

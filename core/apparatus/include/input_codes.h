@@ -125,17 +125,15 @@ constexpr input_code_t AP_KEY_RIGHT_CONTROL      = 345;
 constexpr input_code_t AP_KEY_RIGHT_ALT          = 346;
 constexpr input_code_t AP_KEY_RIGHT_SUPER        = 347;
 constexpr input_code_t AP_KEY_MENU               = 348;
+constexpr input_code_t AP_KEY_COUNT              = AP_KEY_MENU + 1;
 												 
 constexpr input_code_t AP_MOUSE_BUTTON_1         = 0;
 constexpr input_code_t AP_MOUSE_BUTTON_2         = 1;
 constexpr input_code_t AP_MOUSE_BUTTON_3         = 2;
 constexpr input_code_t AP_MOUSE_BUTTON_4         = 3;
 constexpr input_code_t AP_MOUSE_BUTTON_5         = 4;
-constexpr input_code_t AP_MOUSE_BUTTON_6         = 5;
-constexpr input_code_t AP_MOUSE_BUTTON_7         = 6;
-constexpr input_code_t AP_MOUSE_BUTTON_8         = 7;
 constexpr input_code_t AP_MOUSE_BUTTON_LEFT      = AP_MOUSE_BUTTON_1;
 constexpr input_code_t AP_MOUSE_BUTTON_RIGHT     = AP_MOUSE_BUTTON_2;
 constexpr input_code_t AP_MOUSE_BUTTON_MIDDLE    = AP_MOUSE_BUTTON_3;
 
-constexpr input_code_t AP_LAST_KEY               = AP_KEY_MENU;
+constexpr input_code_t AP_MOUSE_BUTTON_COUNT     = AP_MOUSE_BUTTON_5 + 1;

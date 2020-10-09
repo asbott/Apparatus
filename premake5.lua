@@ -90,6 +90,7 @@ workspace "apparatus"
             "imgui",
             "glfw",
             "glad",
+            "box2d"
         }
 
         files { "%{prj.location}/src/**.cpp", "%{prj.location}/include/**.h" }
@@ -152,6 +153,8 @@ workspace "apparatus"
     make_module "ecs_2d_renderer"
 
     make_module "asset_manager"
+
+    make_module "2d_physics"
 
     project "launcher"
         kind "ConsoleApp"
@@ -321,8 +324,23 @@ workspace "apparatus"
         
         defines "IMGUI_IMPL_OPENGL_LOADER_GLAD"
 
-        filter "system:linux"
-            pic "On"
+    project "box2d"
+        location   "deps/box2d"
+        kind       "StaticLib"
+        language   "C++"
+        warnings   "Off"
+        targetdir  ("lib/%{prj.name}")
+        objdir     ("lib/%{prj.name}-int")
+
+        files
+        {
+            "deps/box2d/src/**.cpp"
+        }
+
+        includedirs {
+            "deps/box2d/src",
+            "deps/box2d/include",
+        }
 
     
 

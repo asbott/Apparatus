@@ -7,6 +7,9 @@
 #include <set>
 #include <string>
 #include <queue>
+#include <stack>
+#include <deque>
+#include <mutex>
 
 
 template <typename T>
@@ -31,6 +34,12 @@ using Static_Array = std::array<T, len>;
 
 template <typename T>
 using Queue = std::queue<T>;
+
+template <typename T>
+using Stack = std::stack<T>;
+
+template <typename T>
+using Deque = std::deque<T>;
 
 template<typename T>
 struct Thread_Safe_Queue {

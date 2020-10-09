@@ -33,6 +33,28 @@ struct Component_Info {
 	std::vector<Property_Info> properties;
 };
 
+struct Game_Input {
+	Input_State state;
+
+	inline bool is_mouse_down(input_code_t code) {
+		return state.mouse_down[code];
+	}
+	inline bool is_mouse_pressed(input_code_t code) {
+		return state.mouse_press[code];
+	}
+	inline bool is_key_down(input_code_t code) {
+		return state.keys_down[code];
+	}
+	inline bool is_key_pressed(input_code_t code) {
+		return state.keys_press[code];
+	}
+	inline mz::fvec2 get_mouse_pos() {
+		return state.mouse_pos;
+	}
+
+	mz::fvec2 mouse_world_pos;
+};
+
 struct Gui_Window {
 	bool open;
 	name_str_t name;
@@ -52,6 +74,15 @@ struct Gui_Payload {
 	void* home;
 };
 
+enum Icon_Type : u8 {
+	ICON_TYPE_STOP, ICON_TYPE_PLAY, ICON_TYPE_OPTIONS, ICON_TYPE_TEXTURE,
+	ICON_TYPE_FOLDER, ICON_TYPE_FILE,
+
+	ICON_TYPE_COUNT
+};
+
+#include "imgui_extension.h"
+
 namespace ImGui {
 	inline void DoGuiWindow(Gui_Window* wnd, const std::function<void()>& fn, ImGuiWindowFlags flags = ImGuiWindowFlags_None) {
 		if (wnd->open) {
@@ -61,19 +92,23 @@ namespace ImGui {
 		}
 	}
 
-	
-
+	AP_API void Icon(Icon_Type icon, mz::ivec2 size);
+	AP_API bool IconButton(Icon_Type icon, mz::ivec2 size);
 }
 
 struct Graphics_Context;
 
 void AP_API quit();
 
+// Get input polling for the game window
+AP_API Game_Input* game_input();
+
 AP_API Thread_Server& get_thread_server();
 AP_API thread_id_t get_graphics_thread();
 
 AP_API entt::registry& get_entity_registry();
 
+AP_API void register_module(name_str_t mod_name);
 AP_API Module* get_module(name_str_t str_id);
 
 AP_API void register_gui_window(Gui_Window* wnd);
@@ -81,5 +116,11 @@ AP_API void unregister_gui_window(Gui_Window* wnd);
 
 AP_API void register_gui_popup(Gui_Popup* pop);
 AP_API void unregister_gui_popup(Gui_Popup* pop);
+
+AP_API void select_entity(entt::entity entity);
+AP_API void deselect_entity(entt::entity entity);
+AP_API void deselect_all_entities();
+AP_API bool is_entity_selected(entt::entity entity);
+AP_API const Hash_Set<entt::entity>& get_selected_entities();
 
 AP_API int start(int argc, char** argv);

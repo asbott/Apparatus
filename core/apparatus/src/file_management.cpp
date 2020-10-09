@@ -53,6 +53,10 @@ namespace Path {
         return err.value() == 0;
     }
 
+    bool equals(str_ptr_t path1, str_ptr_t path2) {
+        return fs::equivalent(path1, path2);
+    }
+
     std::error_code remove(str_ptr_t path) {
         std::error_code err;
         ::fs::remove(path, err);
@@ -89,14 +93,25 @@ namespace Path {
         return fs::exists(path);
     }
 
+    bool is_file(str_ptr_t path) {
+        return fs::is_regular_file(path);
+    }
+    bool is_directory(str_ptr_t path) {
+        return fs::is_directory(path);
+    }
+
     void root_name(str_ptr_t path, char* out) {
         strcpy(out, fs::path(path).root_name().generic_string().c_str());
     }
 
     void to_absolute(str_ptr_t relative_path, char* out) {
         fs::path fs_abs = fs::absolute(relative_path);
-
         strcpy(out, fs_abs.generic_string().c_str());
+    }
+
+    void to_relative(str_ptr_t path, str_ptr_t base, char* out) {
+        fs::path rel = fs::relative(path, base);
+        strcpy(out, rel.generic_string().c_str());
     }
 
     std::error_code copy(str_ptr_t src, str_ptr_t dst) {
@@ -168,12 +183,20 @@ namespace Path {
             }
         }
     }
-    void iterate_directories(str_ptr_t path, const std::function<void(str_ptr_t)> fn) {
-        fs::directory_iterator it(path);
+    void iterate_directories(str_ptr_t path, const std::function<void(str_ptr_t)> fn, bool recursive) {
 
-        for (auto entry : it) {
-            if (entry.is_regular_file() || entry.is_directory())
-            fn(entry.path().generic_string().c_str());
+        if (recursive) {
+            fs::recursive_directory_iterator it(path);
+            for (auto entry : it) {
+                if (entry.is_regular_file() || entry.is_directory())
+                fn(entry.path().generic_string().c_str());
+            }
+        } else {
+            fs::directory_iterator it(path);
+            for (auto entry : it) {
+                if (entry.is_regular_file() || entry.is_directory())
+                fn(entry.path().generic_string().c_str());
+            }
         }
     }
 }

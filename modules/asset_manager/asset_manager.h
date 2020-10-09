@@ -3,7 +3,7 @@
 #include "apparatus.h"
 
 typedef u32 asset_request_id_t;
-typedef u32 asset_id_t;
+typedef u64 asset_id_t;
 typedef size_t data_index_t;
 typedef s32 asset_type_t;
 
@@ -37,8 +37,8 @@ struct Asset_Request_Begin_Use_asset : public Asset_Request {
 	asset_id_t asset_id;
 };
 
-struct Asset_Request_End_Use_asset : public Asset_Request {
-	Asset_Request_End_Use_asset() : Asset_Request(ASSET_REQUEST_END_USE_ASSET) {}
+struct Asset_Request_End_Use_Asset : public Asset_Request {
+	Asset_Request_End_Use_Asset() : Asset_Request(ASSET_REQUEST_END_USE_ASSET) {}
 
 	asset_id_t asset_id;
 };
@@ -80,9 +80,13 @@ struct Asset {
 	bool in_use = false;
 	data_index_t data_index;
 
-	bool is_garbage = false;
+	bool is_garbage = true; // Needs to default to true so when assets array is
+						    // resized, uninitialized assets are marked as garbage
+
+	asset_id_t id;
 
 	inline void* get_runtime_data() {
-		return &(*data_stream)[data_index];
+		if (in_memory) return &(*data_stream)[data_index];
+		else           return NULL;
 	}
 };

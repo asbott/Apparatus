@@ -372,9 +372,9 @@ void done(int code) {
         std::cout << green << "\nFinished without errors\n" << white;
     } else {
         std::cout << red << "\nFinished with errors\n" << white;
+        system("pause");
     }
     std::cout << "====================================================================================\n";
-    system("pause");
 
     exit(code);
 }
@@ -457,26 +457,26 @@ template <typename type_t>
 void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
     ImGui::SetCurrentContext(ctx);
 
-    std::string label = name + "##" + std::to_string((uintptr_t)data);
+    std::string label = name;
 
     if constexpr (std::is_same<type_t, bool>()) {
-        ImGui::Checkbox(label.c_str(), data);
+        ImGui::RCheckbox(label.c_str(), data);
     } else if constexpr (std::is_integral<type_t>()) {
-        ImGui::InputInt(label.c_str(), (s32*)data);
+        ImGui::RDragInt(label.c_str(), (s32*)data, .1f);
     } else if constexpr (std::is_same<type_t, mz::ivec2>()) {
-        ImGui::InputInt2(label.c_str(), (s32*)data);
+        ImGui::RDragInt2(label.c_str(), (s32*)data, .1f);
     } else if constexpr (std::is_same<type_t, mz::ivec3>()) {
-        ImGui::InputInt3(label.c_str(), (s32*)data);
+        ImGui::RDragInt3(label.c_str(), (s32*)data, .1f);
     } else if constexpr (std::is_same<type_t, mz::ivec4>()) {
-        ImGui::InputInt4(label.c_str(), (s32*)data);
+        ImGui::RDragInt4(label.c_str(), (s32*)data, .1f);
     } else if constexpr (std::is_same<type_t, f32>()) {
-        ImGui::InputFloat(label.c_str(), data, 0.1f, 0.2f, 5);
+        ImGui::RDragFloat(label.c_str(), (f32*)data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec2>()) {
-        ImGui::InputFloat2(label.c_str(), (f32*)data, 5);
+        ImGui::RDragFloat2(label.c_str(), (f32*)data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec3>()) {
-        ImGui::InputFloat3(label.c_str(), (f32*)data, 5);
+        ImGui::RDragFloat3(label.c_str(), (f32*)data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec4>()) {
-        ImGui::InputFloat4(label.c_str(), (f32*)data, 5);
+        ImGui::RDragFloat4(label.c_str(), (f32*)data, 0.1f);
     } else {
         ImGui::Text("%s N/A", label.c_str());
     }
@@ -512,7 +512,10 @@ extern "C" {
 	}
 
     __declspec(dllexport) uintptr_t __cdecl get_component_id(const std::string& name) {
-        return name_id_map[name];
+        if (name_id_map.find(name) != name_id_map.end())
+            return name_id_map[name];
+        else
+            return 0;
     }
 
 }
@@ -541,14 +544,18 @@ extern "C" {
     std::vector<Token> previous_tokens;
     std::set<std::string> tags;
 
+    bool in_struct = false;
+
     for (auto& file_path : files) {
         std::cout << "\nDoing file " << file_path << "\n";
         auto src = read_file(file_path);
         Lexer lex(src.c_str());
 
-        
-        #define is_end(t) t.is_one_of(Token::Kind::End, Token::Kind::Unexpected)
+        #define is_end(t) t.is(Token::Kind::End)
         for (auto token = lex.next(); !is_end(token); token = lex.next()) {
+            if (token.is(Token::Kind::Semicolon) && previous_tokens[previous_tokens.size() - 1].is(Token::Kind::RightCurly)) {
+                in_struct = false;
+            }
             if (token.is(Token::Kind::Identifier) && token.lexeme() == "tag") {
                 auto next = lex.next();
                 if (!next.is(Token::Kind::LeftParen)) {
@@ -584,6 +591,7 @@ extern "C" {
 
                 tags.clear();
                 std::cout << "\nFound struct '" << item.name << "'\n";
+                in_struct = true;
                 structs.push_back(item);
             }
 
@@ -595,7 +603,8 @@ extern "C" {
                 if (first.is(Token::Kind::Identifier) 
                     && second.is(Token::Kind::Identifier) 
                     && third.is_one_of(Token::Kind::Semicolon, Token::Kind::Equal)
-                    && structs.size() > 0) {
+                    && structs.size() > 0
+                    && in_struct) {
 
                     auto& struct_item = structs[structs.size() - 1];
 
@@ -655,11 +664,11 @@ extern "C" {
                         } else if (member.tags.find("string")  != member.tags.end()) {
                             output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
                             output_stream << "                            std::string s = (char*)data;\n";
-                            output_stream << "                            ImGui::InputText(\"" << member.name << "\", &s);\n";
+                            output_stream << "                            ImGui::RInputText(\"" << member.name << "\", &s);\n";
                             output_stream << "                            strcpy((char*)data, s.c_str());\n";
                         } else if (member.tags.find("color")  != member.tags.end()) {
                             output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
-                            output_stream << "                            ImGui::ColorEdit4(\"" << member.name << "\", (f32*)data);\n";
+                            output_stream << "                            ImGui::RColorEdit4(\"" << member.name << "\", (f32*)data);\n";
                         } else if (member.tags.find("texture")  != member.tags.end()) {
                             output_stream << "                            (void)data;\n";
                             output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
@@ -667,8 +676,8 @@ extern "C" {
                             output_stream << "                            view_request.asset_id = *(asset_id_t*)data;\n";
                             output_stream << "                            Asset* asset_view = get_module(\"asset_manager\")->request<Asset*>(&view_request);\n";
                             output_stream << "                            char na[] = \"<none>\";\n";
-                            output_stream << "                            if (asset_view) ImGui::InputText(\"" << member.name << "\", asset_view->file_name, strlen(asset_view->file_name));\n";
-                            output_stream << "                            else ImGui::InputText(\"" << member.name << "\", na, strlen(na));\n";
+                            output_stream << "                            if (asset_view) ImGui::RInputText(\"" << member.name << "\", asset_view->file_name, strlen(asset_view->file_name));\n";
+                            output_stream << "                            else ImGui::RInputText(\"" << member.name << "\", na, strlen(na));\n";
                             output_stream << "                            if (ImGui::BeginDragDropTarget()) {\n";
                             output_stream << "                                auto* p = ImGui::AcceptDragDropPayload(\"asset\");\n";
                             output_stream << "                                if (p) {\n";

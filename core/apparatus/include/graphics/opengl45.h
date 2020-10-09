@@ -5,6 +5,13 @@
 #ifdef AP_SUPPORT_OPENGL45
 
 struct OpenGL45 {
+
+    struct Render_Target_Info {
+        graphics_id_t fbo;
+        graphics_id_t texture;
+        mz::ivec2 size;
+    };
+
     void init(bool show_window);
     ~OpenGL45();
 
@@ -26,6 +33,7 @@ struct OpenGL45 {
     Dynamic_Array<Buffer_Layout_Specification> _buffer_layouts;
     Dynamic_Array<Buffer_Layout_Specification> _shader_input_layouts;
     Dynamic_Array<Buffer_Layout_Specification> _uniform_buffer_layouts;
+    Dynamic_Array<Render_Target_Info> _render_targets;
 
     Graphics<OpenGL45>* _api;
 

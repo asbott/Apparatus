@@ -2,7 +2,38 @@
 
 #include <spdlog/spdlog.h>
 
-void AP_API init_logger();
+struct Gui_Window;
+
+struct Log_Context {
+	struct Log_Entry {
+		Dynamic_String dynamic_str;
+		spdlog::level::level_enum level;
+	};
+
+	void do_gui(Gui_Window* wnd);
+
+	Deque<Log_Entry> entries;
+	s32 log_entry_limit = 100;
+	bool has_new = true;
+	Hash_Map<spdlog::level::level_enum, bool> filter_flags = {
+		{ spdlog::level::trace,    true },
+		{ spdlog::level::debug,    true },
+		{ spdlog::level::info,     true },
+		{ spdlog::level::warn,     true },
+		{ spdlog::level::err,      true },
+		{ spdlog::level::critical, true }
+	};
+	Hash_Map<spdlog::level::level_enum, mz::color> filter_colors = {
+		{ spdlog::level::trace,    mz::COLOR_WHITE },
+		{ spdlog::level::debug,    mz::COLOR_CYAN },
+		{ spdlog::level::info,     mz::COLOR_GREEN },
+		{ spdlog::level::warn,     mz::COLOR_YELLOW },
+		{ spdlog::level::err,      mz::COLOR_ORANGE },
+		{ spdlog::level::critical, mz::COLOR_RED }
+	};
+};
+
+void AP_API init_logger(std::ostream& ostr, Log_Context* ctx);
 
 void AP_API set_logger_level(spdlog::level::level_enum level);
 

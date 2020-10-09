@@ -4,12 +4,22 @@
 
 #include "asset_manager/asset_manager.h"
 
-tag(component, custom_gui)
+tag(component)
 struct Transform2D {
-	fmat4 matrix = fmat4(1);
+	tag(property)
+	fvec2 position;
+	tag(property)
+	f32 rotation;
+	tag(property)
+	fvec2 scale = fvec2(1);
+
+	fmat4 to_mat4() {
+		fmat4 m = mz::transformation::translation<f32>(position);
+		m.rotate(rotation, { 0, 0, -1 });
+		m.scale(scale - fvec2(1));
+		return m;
+	}
 };
-
-
 
 tag(component)
 struct Sprite2D {
@@ -19,37 +29,18 @@ struct Sprite2D {
 
 	tag(property, color)
 	color tint = COLOR_WHITE;
+
+	tag(property)
+	fvec2 origin = 0;
 };
 
 tag(component)
 struct View2D {
+	View2D() {
+		render_target = G_NULL_ID;
+	}
 	tag(property, color)
 	color16 clear_color = color16(.3f, .1f, .4f, 1.f);
+
+	graphics_id_t render_target = G_NULL_ID;
 };
-
-inline void on_gui(Transform2D* transform, ImGuiContext* ctx) {
-	ImGui::SetCurrentContext(ctx);
-
-	auto& matrix = transform->matrix;
-
-	fvec2 pos (
-		matrix.rows[0].w,
-		matrix.rows[1].w
-	);
-	ImGui::DragFloat2("position", pos.ptr);
-	matrix.rows[0].w = pos.x;
-	matrix.rows[1].w = pos.y;
-
-	/*float rotation = atan(matrix.rows[0].y / matrix.rows[1].y);
-	matrix.rotate(-rotation, fvec3(0, 0, 1));
-	ImGui::DragFloat("rotation", &rotation, .05f);
-	matrix.rotate(rotation, fvec3(0, 0, 1));
-
-	fvec2 scale (
-	sqrt(matrix.rows[0].x * matrix.rows[0].x + matrix.rows[0].y * matrix.rows[0].y), 
-	sqrt(matrix.rows[1].x * matrix.rows[1].x + matrix.rows[1].y * matrix.rows[1].y)
-	);
-	matrix.scale((-scale));
-	ImGui::DragFloat2("scale", scale.ptr, .01f);
-	matrix.scale(scale);*/
-}
