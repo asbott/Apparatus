@@ -481,6 +481,7 @@ void OpenGL45::init(bool show_window) {
     (void)opengl_init_result;
 
     glLineWidth(2);
+    glPointSize(5);
 }
 
 OpenGL45::~OpenGL45() {

@@ -103,5 +103,4 @@
 	#define AP_API __declspec(dllimport)
 #endif
 
-
-
+#define stringify(x) #x

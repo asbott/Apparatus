@@ -28,12 +28,24 @@ constexpr inline str_ptr_t shape_type_str(Collision_Shape_Type_2D body_type) {
     }
 }
 
+struct PhysicsBody2D;
+struct CollisionShape2D;
+
+struct Contact2D {
+    entt::entity other_entity;
+    PhysicsBody2D* other_body;
+    CollisionShape2D* other_shape;
+};
+
+typedef std::function<void(const Contact2D& contact)> collision_callback_t;
+
 tag(component, custom_gui)
 struct PhysicsBody2D {
     f32 friction = .3f;
     f32 density = 1.f;
     f32 restitution = .0f;
     fvec2 velocity = 0;
+
     
     Physics_Body_Type body_type = BODY_TYPE_DYNAMIC;
 
@@ -42,8 +54,20 @@ struct PhysicsBody2D {
     fvec2 _last_sim_vel;
     fvec2 _last_world_scale;
 
-    void* _body;
-    void* _fixture;
+    f32 _last_friction = friction;
+    f32 _last_density = density;
+    f32 _last_restitution = restitution;
+
+    collision_callback_t on_contact_begin = 0;
+    collision_callback_t on_contact_end   = 0;
+
+    std::function<void(fvec2 force)> apply_force;
+    std::function<void(fvec2 force, fvec2 point)> apply_force_to_point;
+    std::function<void(fvec2 impulse)> apply_impulse;
+    std::function<void(fvec2 impulse, fvec2 point)> apply_impulse_to_point;
+
+    void* _body = NULL;
+    void* _fixture = NULL;
 };
 
 tag(component, custom_gui)
@@ -57,9 +81,7 @@ struct CollisionShape2D {
     fvec2 _last_half_extents;
 };
 
-inline void on_gui(PhysicsBody2D* body, ImGuiContext* ctx) {
-    ImGui::SetCurrentContext(ctx);
-
+inline void on_gui(PhysicsBody2D* body) {
     if (ImGui::RBeginCombo("Body type", body_type_str(body->body_type))) {
         if (ImGui::Selectable(body_type_str(BODY_TYPE_DYNAMIC))) {
             body->body_type = BODY_TYPE_DYNAMIC;
@@ -81,9 +103,7 @@ inline void on_gui(PhysicsBody2D* body, ImGuiContext* ctx) {
     }
 }
 
-inline void on_gui(CollisionShape2D* shape, ImGuiContext* ctx) {
-    ImGui::SetCurrentContext(ctx);
-
+inline void on_gui(CollisionShape2D* shape) {
     ImGui::RDragFloat2("Offset", shape->offset.ptr, .1f);
     ImGui::RCheckbox("Is trigger", &shape->is_trigger);
 

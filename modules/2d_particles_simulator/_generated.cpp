@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/2d_physics/2d_physics.h"
+#include "D:/dev/Apparatus/modules/2d_particles_simulator/2d_particles_simulator.h"
 
 #include <vector>
 #include <functional>
@@ -44,135 +44,104 @@ extern "C" {
 	__declspec(dllexport) void __cdecl init() {
 
         {
-            uintptr_t id = (uintptr_t)typeid(PhysicsBody2D).name();
+            uintptr_t id = (uintptr_t)typeid(ParticleSimulation2D).name();
             runtime_ids.emplace(id);
-            name_id_map["PhysicsBody2D"] = id;
+            name_id_map["ParticleSimulation2D"] = id;
             component_info[id] = {
                 [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<PhysicsBody2D>(entity);
+                    return &reg.emplace<ParticleSimulation2D>(entity);
                 },
                 [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<PhysicsBody2D>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<PhysicsBody2D>(entity);
+                    if (!reg.has<ParticleSimulation2D>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<ParticleSimulation2D>(entity);
                 }, 
                 [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<PhysicsBody2D>(entity);
+                    reg.remove<ParticleSimulation2D>(entity);
                 },
             
-                "PhysicsBody2D",
+                "ParticleSimulation2D",
                 id,
                 true,
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data) {
-                            on_gui((PhysicsBody2D*)data);
+                            on_gui((ParticleSimulation2D*)data);
                         },
-                        "friction",
-                        sizeof(f32),
+                        "type",
+                        sizeof(Particle_Type),
                         0,
                     },
                     Property_Info { 
                         [](void* data) {
-                            on_gui((PhysicsBody2D*)data);
+                            on_gui((ParticleSimulation2D*)data);
                         },
-                        "density",
-                        sizeof(f32),
-                        sizeof(f32),
-                    },
-                    Property_Info { 
-                        [](void* data) {
-                            on_gui((PhysicsBody2D*)data);
-                        },
-                        "restitution",
-                        sizeof(f32),
-                        sizeof(f32)+sizeof(f32),
-                    },
-                    Property_Info { 
-                        [](void* data) {
-                            on_gui((PhysicsBody2D*)data);
-                        },
-                        "velocity",
-                        sizeof(fvec2),
-                        sizeof(f32)+sizeof(f32)+sizeof(f32),
-                    },
-                    Property_Info { 
-                        [](void* data) {
-                            on_gui((PhysicsBody2D*)data);
-                        },
-                        "body_type",
-                        sizeof(Physics_Body_Type),
-                        sizeof(f32)+sizeof(f32)+sizeof(f32)+sizeof(fvec2),
-                    },
-                    Property_Info { 
-                        [](void* data) {
-                            on_gui((PhysicsBody2D*)data);
-                        },
-                        "on_contact_begin",
-                        sizeof(collision_callback_t),
-                        sizeof(f32)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(Physics_Body_Type),
-                    },
-                    Property_Info { 
-                        [](void* data) {
-                            on_gui((PhysicsBody2D*)data);
-                        },
-                        "on_contact_end",
-                        sizeof(collision_callback_t),
-                        sizeof(f32)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(Physics_Body_Type)+sizeof(collision_callback_t),
-                    },
-                }
-            };
-        }
-        {
-            uintptr_t id = (uintptr_t)typeid(CollisionShape2D).name();
-            runtime_ids.emplace(id);
-            name_id_map["CollisionShape2D"] = id;
-            component_info[id] = {
-                [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<CollisionShape2D>(entity);
-                },
-                [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<CollisionShape2D>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<CollisionShape2D>(entity);
-                }, 
-                [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<CollisionShape2D>(entity);
-                },
-            
-                "CollisionShape2D",
-                id,
-                true,
-                std::vector<Property_Info> {
-                    Property_Info { 
-                        [](void* data) {
-                            on_gui((CollisionShape2D*)data);
-                        },
-                        "offset",
-                        sizeof(fvec2),
-                        0,
-                    },
-                    Property_Info { 
-                        [](void* data) {
-                            on_gui((CollisionShape2D*)data);
-                        },
-                        "is_trigger",
+                        "loop",
                         sizeof(bool),
-                        sizeof(fvec2),
+                        sizeof(Particle_Type),
                     },
                     Property_Info { 
                         [](void* data) {
-                            on_gui((CollisionShape2D*)data);
+                            on_gui((ParticleSimulation2D*)data);
                         },
-                        "half_extents",
-                        sizeof(fvec2),
-                        sizeof(fvec2)+sizeof(bool),
+                        "duration",
+                        sizeof(f32),
+                        sizeof(Particle_Type)+sizeof(bool),
                     },
                     Property_Info { 
                         [](void* data) {
-                            on_gui((CollisionShape2D*)data);
+                            on_gui((ParticleSimulation2D*)data);
                         },
-                        "shape_type",
-                        sizeof(Collision_Shape_Type_2D),
-                        sizeof(fvec2)+sizeof(bool)+sizeof(fvec2),
+                        "spawn_rate",
+                        sizeof(f32),
+                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((ParticleSimulation2D*)data);
+                        },
+                        "angle_range",
+                        sizeof(fvec2),
+                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((ParticleSimulation2D*)data);
+                        },
+                        "speed_range",
+                        sizeof(fvec2),
+                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((ParticleSimulation2D*)data);
+                        },
+                        "life_time",
+                        sizeof(f32),
+                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(fvec2),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((ParticleSimulation2D*)data);
+                        },
+                        "preview_in_editor",
+                        sizeof(bool),
+                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(fvec2)+sizeof(f32),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((ParticleSimulation2D*)data);
+                        },
+                        "play_on_start",
+                        sizeof(bool),
+                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(fvec2)+sizeof(f32)+sizeof(bool),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((ParticleSimulation2D*)data);
+                        },
+                        "state",
+                        sizeof(Particle_Simulation_State),
+                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(fvec2)+sizeof(f32)+sizeof(bool)+sizeof(bool),
                     },
                 }
             };

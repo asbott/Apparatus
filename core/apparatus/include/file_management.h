@@ -37,6 +37,8 @@ namespace Path {
     AP_API void name_without_extension(str_ptr_t path, char* out);
     AP_API void name_with_extension(str_ptr_t path, char* out);
 
+    AP_API bool has_extension(str_ptr_t path);
+
     AP_API void directory_of(str_ptr_t path, char* out);
 
     AP_API void iterate_directories(str_ptr_t path, const std::function<void(str_ptr_t)> fn, bool recursive = false);

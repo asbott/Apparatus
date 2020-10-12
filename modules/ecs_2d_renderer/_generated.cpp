@@ -11,8 +11,7 @@ Hash_Map<std::string, uintptr_t> name_id_map;
 Hash_Map<uintptr_t, Component_Info> component_info;
 
 template <typename type_t>
-void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
-    ImGui::SetCurrentContext(ctx);
+void do_gui(const std::string& name, type_t* data) {
 
     std::string label = name;
 
@@ -65,24 +64,24 @@ extern "C" {
                 false,
                 std::vector<Property_Info> {
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec2>("position", (fvec2*)data, ctx);
+                        [](void* data) {
+                            do_gui<fvec2>("position", (fvec2*)data);
                         },
                         "position",
                         sizeof(fvec2),
                         0,
                     },
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<f32>("rotation", (f32*)data, ctx);
+                        [](void* data) {
+                            do_gui<f32>("rotation", (f32*)data);
                         },
                         "rotation",
                         sizeof(f32),
                         sizeof(fvec2),
                     },
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec2>("scale", (fvec2*)data, ctx);
+                        [](void* data) {
+                            do_gui<fvec2>("scale", (fvec2*)data);
                         },
                         "scale",
                         sizeof(fvec2),
@@ -112,12 +111,11 @@ extern "C" {
                 false,
                 std::vector<Property_Info> {
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
+                        [](void* data) {
                             (void)data;
-                            ImGui::SetCurrentContext(ctx);
                             Asset_Request_View view_request;
                             view_request.asset_id = *(asset_id_t*)data;
-                            Asset* asset_view = get_module("asset_manager")->request<Asset*>(&view_request);
+                            Asset* asset_view = get_module("asset_manager")->request<Asset*>(view_request);
                             char na[] = "<none>";
                             if (asset_view) ImGui::RInputText("texture", asset_view->file_name, strlen(asset_view->file_name));
                             else ImGui::RInputText("texture", na, strlen(na));
@@ -127,7 +125,7 @@ extern "C" {
                                     auto payload = (Gui_Payload*)p->Data;
                                     auto new_id = (asset_id_t)(uintptr_t)payload->value;
                                     view_request.asset_id = new_id;
-                                    asset_view = get_module("asset_manager")->request<Asset*>(&view_request);
+                                    asset_view = get_module("asset_manager")->request<Asset*>(view_request);
                                     if (asset_view && asset_view->asset_type == ASSET_TYPE_TEXTURE) memcpy(data, &new_id, sizeof(asset_id_t));
                                 }
                             ImGui::EndDragDropTarget();
@@ -138,8 +136,7 @@ extern "C" {
                         0,
                     },
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            ImGui::SetCurrentContext(ctx);
+                        [](void* data) {
                             ImGui::RColorEdit4("tint", (f32*)data);
                         },
                         "tint",
@@ -147,8 +144,8 @@ extern "C" {
                         sizeof(asset_id_t),
                     },
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<fvec2>("origin", (fvec2*)data, ctx);
+                        [](void* data) {
+                            do_gui<fvec2>("origin", (fvec2*)data);
                         },
                         "origin",
                         sizeof(fvec2),
@@ -178,8 +175,7 @@ extern "C" {
                 false,
                 std::vector<Property_Info> {
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            ImGui::SetCurrentContext(ctx);
+                        [](void* data) {
                             ImGui::RColorEdit4("clear_color", (f32*)data);
                         },
                         "clear_color",
@@ -218,6 +214,10 @@ extern "C" {
             return name_id_map[name];
         else
             return 0;
+    }
+
+    __declspec(dllexport) void __cdecl set_imgui_context(ImGuiContext* ctx) {
+        ImGui::SetCurrentContext(ctx);
     }
 
 }

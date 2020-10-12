@@ -454,8 +454,7 @@ Hash_Map<std::string, uintptr_t> name_id_map;
 Hash_Map<uintptr_t, Component_Info> component_info;
 
 template <typename type_t>
-void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
-    ImGui::SetCurrentContext(ctx);
+void do_gui(const std::string& name, type_t* data) {
 
     std::string label = name;
 
@@ -516,6 +515,10 @@ extern "C" {
             return name_id_map[name];
         else
             return 0;
+    }
+
+    __declspec(dllexport) void __cdecl set_imgui_context(ImGuiContext* ctx) {
+        ImGui::SetCurrentContext(ctx);
     }
 
 }
@@ -656,25 +659,21 @@ extern "C" {
                         if (this_offset.size() > 1) this_offset.pop_back();
                         if (this_offset == "") this_offset = "0";
                         output_stream << "                    Property_Info { \n";
-                        output_stream << "                        [](void* data, ImGuiContext* ctx) {\n";
+                        output_stream << "                        [](void* data) {\n";
 
                         if (struct_item.tags.find("custom_gui") != struct_item.tags.end()) {
-                            output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
-                            output_stream << "                            on_gui((" << struct_item.name << "*)data, ctx);\n";
+                            output_stream << "                            on_gui((" << struct_item.name << "*)data);\n";
                         } else if (member.tags.find("string")  != member.tags.end()) {
-                            output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
                             output_stream << "                            std::string s = (char*)data;\n";
                             output_stream << "                            ImGui::RInputText(\"" << member.name << "\", &s);\n";
                             output_stream << "                            strcpy((char*)data, s.c_str());\n";
                         } else if (member.tags.find("color")  != member.tags.end()) {
-                            output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
                             output_stream << "                            ImGui::RColorEdit4(\"" << member.name << "\", (f32*)data);\n";
                         } else if (member.tags.find("texture")  != member.tags.end()) {
                             output_stream << "                            (void)data;\n";
-                            output_stream << "                            ImGui::SetCurrentContext(ctx);\n";
                             output_stream << "                            Asset_Request_View view_request;\n";
                             output_stream << "                            view_request.asset_id = *(asset_id_t*)data;\n";
-                            output_stream << "                            Asset* asset_view = get_module(\"asset_manager\")->request<Asset*>(&view_request);\n";
+                            output_stream << "                            Asset* asset_view = get_module(\"asset_manager\")->request<Asset*>(view_request);\n";
                             output_stream << "                            char na[] = \"<none>\";\n";
                             output_stream << "                            if (asset_view) ImGui::RInputText(\"" << member.name << "\", asset_view->file_name, strlen(asset_view->file_name));\n";
                             output_stream << "                            else ImGui::RInputText(\"" << member.name << "\", na, strlen(na));\n";
@@ -684,13 +683,13 @@ extern "C" {
                             output_stream << "                                    auto payload = (Gui_Payload*)p->Data;\n";
                             output_stream << "                                    auto new_id = (asset_id_t)(uintptr_t)payload->value;\n";
                             output_stream << "                                    view_request.asset_id = new_id;\n";
-                            output_stream << "                                    asset_view = get_module(\"asset_manager\")->request<Asset*>(&view_request);\n";
+                            output_stream << "                                    asset_view = get_module(\"asset_manager\")->request<Asset*>(view_request);\n";
                             output_stream << "                                    if (asset_view && asset_view->asset_type == ASSET_TYPE_TEXTURE) memcpy(data, &new_id, sizeof(asset_id_t));\n";
                             output_stream << "                                }\n";
                             output_stream << "                            ImGui::EndDragDropTarget();\n";
                             output_stream << "                            }\n";
                         } else { 
-                            output_stream << "                            do_gui<" << member.property_type << ">(\"" << member.name << "\", (" << member.property_type << "*)data, ctx);\n";
+                            output_stream << "                            do_gui<" << member.property_type << ">(\"" << member.name << "\", (" << member.property_type << "*)data);\n";
                         }
 
                         output_stream << "                        },\n";

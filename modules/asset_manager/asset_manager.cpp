@@ -56,7 +56,7 @@ u32 number_of_assets_in_use = 0;
 
 Graphics_Context* g_graphics;
 
-Asset_Directory* g_root_directory;
+Asset_Directory* g_root_directory = NULL;
 Asset_Directory* g_selected_dir = NULL;
 
 constexpr str_ptr_t disk_file_name = "assetlist";
@@ -317,7 +317,7 @@ void clear_assets() {
         if (asset.in_memory) unload_from_memory(asset.id);
     }
     assets.clear();
-    g_root_directory->clear();
+    if (g_root_directory) g_root_directory->clear();
     runtime_data.clear();
     taken_uids.clear();
 }
@@ -326,10 +326,6 @@ extern "C" {
     _export void __cdecl on_load(Graphics_Context* graphics) {
         (void)graphics;
         srand((u32)time(NULL));
-        sprintf(g_assets_dir, "%s/../../assets", get_executable_directory());
-
-        g_root_directory = new Asset_Directory(NULL, g_assets_dir);
-        g_selected_dir = g_root_directory;
 
         path_str_t folder_icon_path = "";
         path_str_t file_icon_path = "";
@@ -496,10 +492,17 @@ extern "C" {
     _export void __cdecl load_from_disk(str_ptr_t dir) {
         clear_assets();
 
+        sprintf(g_assets_dir, "%s/assets", dir);
+
+        if (g_root_directory) delete g_root_directory;
+        g_root_directory = new Asset_Directory(NULL, g_assets_dir);
+        g_selected_dir = g_root_directory;
+
         path_str_t file_path = "";
         sprintf(file_path, "%s/%s", dir, disk_file_name);
 
         sprintf(g_assets_dir, "%s/assets", dir);
+        if (!Path::exists(g_assets_dir)) Path::create_directory(g_assets_dir);
 
         if (!Path::exists(file_path)) {
             log_warn("No assets file found at\n{}", file_path);
@@ -677,10 +680,8 @@ extern "C" {
         depth++;
     }
 
-    _export void __cdecl on_gui(Graphics_Context* graphics, ImGuiContext* imgui_ctx) {
-        (void)graphics;(void)imgui_ctx;
-
-        ImGui::SetCurrentContext(imgui_ctx);
+    _export void __cdecl on_gui(Graphics_Context* graphics) {
+        (void)graphics;
 
         ImGui::DoGuiWindow(&g_asset_manager, [&]() {
 

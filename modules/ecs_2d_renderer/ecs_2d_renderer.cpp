@@ -113,69 +113,12 @@ constexpr size_t BUDGET = MAX_VERTICES * sizeof(Vertex);
 
 Graphics_Context* g_graphics;
 
-template <typename vertex_t>
-struct Render_Context {
-
-	Render_Context() {
-		data = (vertex_t*)malloc(BUDGET);
-		data_ptr = data;
-	}
-
-	~Render_Context() {
-		free(data);
-
-		g_graphics->destroy_shader(shader);
-		g_graphics->destroy_vertex_buffer(vbo);
-		g_graphics->destroy_index_buffer(ibo);
-		g_graphics->destroy_uniform_buffer(ubo);
-		g_graphics->destroy_vertex_array(vao);
-	}
-
-	void set_shader(Graphics_Context* graphics, str_ptr_t vert_src, str_ptr_t frag_src, Buffer_Layout_Specification& layout) {
-		graphics_id_t vert_shader = graphics->make_shader_source(G_SHADER_SOURCE_TYPE_VERTEX,   vert_src);
-		graphics_id_t frag_shader = graphics->make_shader_source(G_SHADER_SOURCE_TYPE_FRAGMENT, frag_src);
-		
-		shader = graphics->make_shader(vert_shader, frag_shader, layout);
-		
-		graphics->destroy_shader_source(vert_shader);
-		graphics->destroy_shader_source(frag_shader);
-	}
-
-	void set_buffers(Graphics_Context* graphics, Buffer_Layout_Specification& vao_layout, Dynamic_Array<u32>& indices, Buffer_Layout_Specification& ubo_layout) {
-		vao = graphics->make_vertex_array(vao_layout);
-
-		vbo = graphics->make_vertex_buffer(data, BUDGET, G_BUFFER_USAGE_DYNAMIC_WRITE);
-
-		ibo = graphics->make_index_buffer(indices.data(), indices.size(), G_BUFFER_USAGE_STATIC_WRITE);
-
-		graphics->associate_vertex_buffer(vbo, vao);
-		graphics->associate_index_buffer (ibo, vao);
-
-		ubo = graphics->make_uniform_buffer(&shader_data, ubo_layout, G_BUFFER_USAGE_DYNAMIC_WRITE);
-	}
-
-	struct Uniform_Buffer {
-		alignas(16) fmat4 cam_transform;
-	} shader_data;
-
-	graphics_id_t shader;
-	graphics_id_t ibo;
-	graphics_id_t vao;
-	graphics_id_t vbo;
-	graphics_id_t ubo;
-
-	vertex_t* data;
-	vertex_t* data_ptr;
-};
-
-
-
 Module* g_asset_module;
 
 
-Render_Context<Vertex> quad_render_context;
-Render_Context<Vertex> editor_render_context;
-Render_Context<Gizmo_Vertex> gizmo_render_context;
+Render_Context<Vertex, BUDGET> quad_render_context;
+Render_Context<Vertex, BUDGET> editor_render_context;
+Render_Context<Gizmo_Vertex, BUDGET> gizmo_render_context;
 
 
 struct Gizmo {
@@ -267,18 +210,14 @@ Gui_Window g_viewport    = { true, "2D Viewport" };
 Gui_Window g_editor_view = { true, "2D Editor" };
 
 entt::entity selected_camera = entt::null;
-name_str_t selected_camera_name = "";
 
 Gizmo_List gizmo_list;
 
 Hash_Set<graphics_id_t> render_targets_to_destroy;
 
-graphics_id_t g_editor_target;
-fmat4 g_editor_transform;
-fmat4 g_editor_ortho;
-color16 g_editor_clear_color = color16(.3f, .1f, .4f, 1.f);
+Editor_View g_editor_cam;
 
-void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& ortho, const color16& clear_color, graphics_id_t render_target, Render_Context<Vertex>& context, fvec2 view_size) {
+void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& ortho, const color16& clear_color, graphics_id_t render_target, Render_Context<Vertex, BUDGET>& context, fvec2 view_size) {
 	(void)ortho; (void)view_size;
 	auto& reg = get_entity_registry();
 
@@ -310,12 +249,12 @@ void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& 
 		valid_request.asset_id = sprite.texture;
 		bool texture_is_valid = g_asset_module 
 			&& g_asset_module->is_loaded 
-			&& g_asset_module->request<bool>(&valid_request);
+			&& g_asset_module->request<bool>(valid_request);
 
 		if (texture_is_valid) {
 			Asset_Request_Begin_Use_asset use_request;
 			use_request.asset_id = sprite.texture;
-			Asset* asset = g_asset_module->request<Asset*>(&use_request);
+			Asset* asset = g_asset_module->request<Asset*>(use_request);
 			ap_assert(asset != NULL, "Asset should not be able to be invalid here");
 			ap_assert(asset->asset_type == ASSET_TYPE_TEXTURE, "Asset should not be able to be anything else than texture here");
 			ap_assert(asset->in_memory, "Asset should always be in memory after requesting to use it");
@@ -340,7 +279,7 @@ void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& 
 
 			Asset_Request_End_Use_Asset end_use_request;
 			end_use_request.asset_id = sprite.texture;
-			g_asset_module->request<void*>(&end_use_request);
+			g_asset_module->request<void*>(end_use_request);
 		}
 
 
@@ -463,11 +402,11 @@ fquad get_selection_quad(entt::registry& reg, entt::entity entity, Transform2D& 
 		Asset_Request_Check_If_Valid valid_request;
 		valid_request.asset_id = sprite.texture;
 
-		if (g_asset_module && g_asset_module->request<bool>(&valid_request)) {
+		if (g_asset_module && g_asset_module->request<bool>(valid_request)) {
 			Asset_Request_Begin_Use_asset use_request;
 			use_request.asset_id = sprite.texture;
 
-			if (Asset* asset = g_asset_module->request<Asset*>(&use_request)) {
+			if (Asset* asset = g_asset_module->request<Asset*>(use_request)) {
 				if (asset->asset_type != ASSET_TYPE_TEXTURE) return 0;
 				auto* texture_data = (Texture_Data*)asset->get_runtime_data();
 				fvec2 size = texture_data->size;
@@ -483,7 +422,7 @@ fquad get_selection_quad(entt::registry& reg, entt::entity entity, Transform2D& 
 
 				Asset_Request_End_Use_Asset end_use_request;
 				end_use_request.asset_id = sprite.texture;
-				g_asset_module->request<void>(&end_use_request);
+				g_asset_module->request<void>(end_use_request);
 			}
 		}
 	} 
@@ -493,7 +432,7 @@ fquad get_selection_quad(entt::registry& reg, entt::entity entity, Transform2D& 
 		fvec2 hs = 0;
 		if (shape.shape_type == SHAPE_2D_RECT) {
 			hs = shape.half_extents;
-		} else if (shape.shape_type == SHAPE_2D_RECT) {
+		} else if (shape.shape_type == SHAPE_2D_CIRCLE) {
 			hs = shape.half_extents.x;
 		} else {
 			ap_assert(false, "Unhandled shape type");
@@ -519,7 +458,7 @@ extern "C" {
 		register_gui_window(&g_editor_view);
 
 		g_game_ortho = mz::projection::ortho<float>(-game_size.width / 2.f, game_size.width / 2.f, -game_size.height / 2.f, game_size.height / 2.f, -1, 1);
-		g_editor_ortho = mz::projection::ortho<float>(-1920 / 2.f, 1920 / 2.f, -1080 / 2.f, 1080 / 2.f, -1, 1);
+		g_editor_cam.ortho = mz::projection::ortho<float>(-1920 / 2.f, 1920 / 2.f, -1080 / 2.f, 1080 / 2.f, -1, 1);
 
 		graphics->set_clear_color(mz::color(.35f, .1f, .65f, 1.f));
 
@@ -587,7 +526,7 @@ extern "C" {
 
 		g_asset_module = get_module("asset_manager");
 
-		g_editor_target = graphics->make_render_target({ 1920, 1080 });
+		g_editor_cam.render_target = graphics->make_render_target({ 1920, 1080 });
 	}
 
 	_export void __cdecl on_unload(Graphics_Context* graphics) {
@@ -595,14 +534,12 @@ extern "C" {
 
 		unregister_gui_window(&g_viewport);
 
-		graphics->destroy_render_target(g_editor_target);
+		graphics->destroy_render_target(g_editor_cam.render_target);
 	}
 
 	_export void __cdecl on_play_begin() {
 		auto& reg = get_entity_registry();
-		if (reg.valid(selected_camera)) {
-			strcpy(selected_camera_name, reg.get<Entity_Info>(selected_camera).name);
-		} else {
+		if (!reg.valid(selected_camera))  {
 			const auto& view = reg.view<View2D, Transform2D>();
 			if (view.size() > 0) {
 				selected_camera = view.front();
@@ -610,23 +547,54 @@ extern "C" {
 				log_warn("No camera was found in the scene");
 			}
 		}
+
+		ImGui::SetWindowFocus("2D Viewport");
+
+		if (reg.valid(selected_camera)) {
+			path_str_t ecs2d_file = "";
+			sprintf(ecs2d_file, "%s/%s", get_user_directory(), "ecs2d");
+
+			Binary_Archive archive(ecs2d_file);
+
+			archive.write("selected_camera", reg.get<Entity_Info>(selected_camera).name);
+
+			archive.flush();
+		}
 	}
 
 	_export void __cdecl on_play_stop() {
-		auto& reg = get_entity_registry();
-
-		reg.view<View2D, Entity_Info>().each([](entt::entity entity, View2D& view, Entity_Info& info) {
-			(void)view;
-			if (strcmp(info.name, selected_camera_name) == 0) {
-				selected_camera = entity;
-				return;
-			}
-		});
-
 		for (graphics_id_t render_target : render_targets_to_destroy) {
 			g_graphics->destroy_render_target(render_target);
 		}
 		render_targets_to_destroy.clear();
+
+		path_str_t ecs2d_file = "";
+        sprintf(ecs2d_file, "%s/%s", get_user_directory(), "ecs2d");
+
+		Binary_Archive archive(ecs2d_file);
+
+		if (archive.is_valid_id("selected_camera")) {
+			str_ptr_t name = archive.read<name_str_t>("selected_camera");
+
+			auto& reg = get_entity_registry();
+			reg.view<View2D, Entity_Info>().each([&name](entt::entity entity, View2D& view, Entity_Info& info) {
+				(void)view;
+				if (strcmp(info.name, name) == 0) {
+					selected_camera = entity;
+					return;
+				}
+			});
+		}
+	}
+
+	_export void __cdecl save_to_disk(str_ptr_t dir) {
+		(void)dir;
+        
+    }
+
+    _export void __cdecl load_from_disk(str_ptr_t dir) {
+		(void)dir;
+		
 	}
 
 	_export void __cdecl on_update(float delta) {
@@ -664,7 +632,7 @@ extern "C" {
 			}
 		});
 
-		reg.view<View2D, Transform2D>().each([](View2D& , Transform2D transform) {
+		reg.view<View2D, Transform2D>().each([](View2D& view, Transform2D transform) {
 			fmat4 matrix = transform.to_mat4();
 			fvec2 hs = game_size / 2.f;
 			gizmo_list.add_wire_quad(fquad(
@@ -673,7 +641,15 @@ extern "C" {
 				(matrix * fvec4( hs.x, -hs.y, 1, 1)).v2,
 				(matrix * fvec4(-hs.x, -hs.y, 1, 1)).v2
 			));
+
+			view.ortho = g_game_ortho;
 		});
+
+		for (auto ent : get_selected_entities()) {
+			if (reg.has<Transform2D>(ent)) {
+				gizmo_list.add_wire_quad(get_selection_quad(reg, ent, reg.get<Transform2D>(ent)), COLOR_RED);
+			}
+		}
 
 		reg.view<View2D, Transform2D>().each([graphics, &reg](View2D& view, Transform2D& view_transform) {
 			(void)view_transform;
@@ -690,22 +666,21 @@ extern "C" {
 			render_sprites(graphics, view_transform.to_mat4(), g_game_ortho, view.clear_color, view.render_target, quad_render_context, game_size);
 		});
 
-		graphics->set_clear_color(g_editor_clear_color);
-		auto render_target_size = graphics->get_render_target_size(g_editor_target);
+		graphics->set_clear_color(g_editor_cam.clear_color);
+		auto render_target_size = graphics->get_render_target_size(g_editor_cam.render_target);
 		graphics->set_viewport(mz::viewport(0, 0, render_target_size.width, render_target_size.height));
-		graphics->clear(G_COLOR_BUFFER_BIT, g_editor_target);
-		render_sprites(graphics, g_editor_transform, g_editor_ortho, g_editor_clear_color, g_editor_target, editor_render_context, graphics->get_render_target_size(g_editor_target));
+		graphics->clear(G_COLOR_BUFFER_BIT, g_editor_cam.render_target);
+		render_sprites(graphics, g_editor_cam.transform, g_editor_cam.ortho, g_editor_cam.clear_color, g_editor_cam.render_target, editor_render_context, graphics->get_render_target_size(g_editor_cam.render_target));
 	
 		if (gizmo_list.enable) {
 			gizmo_render_context.data_ptr = gizmo_render_context.data;
 			u32 index_count = 0;
 			u32 vertex_count = 0;
 
-			fmat4 cam_transform = g_editor_transform;
-			//auto view_inverted = view.translate(-graphics->get_render_target_size(g_editor_target) / 2.f);
+			fmat4 cam_transform = g_editor_cam.transform;
 			cam_transform.rows[2].w = -.5f;
 			cam_transform.invert();
-			cam_transform = g_editor_ortho * cam_transform;
+			cam_transform = g_editor_cam.ortho * cam_transform;
 			graphics->set_uniform_buffer_data(gizmo_render_context.ubo, "cam_transform", cam_transform.ptr);
 
 			for (auto& line : gizmo_list.lines) {
@@ -785,7 +760,7 @@ extern "C" {
 				get_thread_server().wait_for_thread(get_graphics_thread());
 				graphics->set_vertex_buffer_data(gizmo_render_context.vbo, gizmo_render_context.data, 0, vertex_count * sizeof(Gizmo_Vertex));
 				
-				graphics->draw_indices(gizmo_render_context.vao, gizmo_render_context.shader, index_count, gizmo_render_context.ubo, G_DRAW_MODE_LINES, g_editor_target);
+				graphics->draw_indices(gizmo_render_context.vao, gizmo_render_context.shader, index_count, gizmo_render_context.ubo, G_DRAW_MODE_LINES, g_editor_cam.render_target);
 			}
 
 			gizmo_list.clear();
@@ -851,6 +826,7 @@ extern "C" {
 				);
 
 				is_game_hovered = ImGui::IsItemHovered();
+				bool is_game_focused = ImGui::IsWindowFocused();
 
 				auto gui_wnd_pos = (mz::ivec2)ImGui::GetWindowPos();
 				mz::ivec2 wnd_pos = ImGui::GetWindowViewport()->Pos;
@@ -875,13 +851,13 @@ extern "C" {
 				game_input()->mouse_world_pos = mouse_world_pos;
 
 				for (int i = AP_KEY_SPACE; i < AP_KEY_COUNT; i++) {
-					game_input()->state.keys_press[i] = is_game_hovered && ImGui::IsKeyPressed(i, false);
-					game_input()->state.keys_down[i] = is_game_hovered && ImGui::IsKeyDown(i);
+					game_input()->state.keys_press[i] = is_game_focused && ImGui::IsKeyPressed(i, false);
+					game_input()->state.keys_down[i] = is_game_focused && ImGui::IsKeyDown(i);
 				}
 
 				for (int i = AP_MOUSE_BUTTON_1; i < AP_MOUSE_BUTTON_COUNT; i++) {
-					game_input()->state.mouse_press[i] = is_game_hovered && ImGui::IsMouseClicked(i);
-					game_input()->state.mouse_down[i] = is_game_hovered && ImGui::IsMouseDown(i);
+					game_input()->state.mouse_press[i] = is_game_focused && ImGui::IsMouseClicked(i);
+					game_input()->state.mouse_down[i] = is_game_focused && ImGui::IsMouseDown(i);
 				}
 			} else {
 				ImGui::Text("No valid entity with View2D and Transform2D selected");
@@ -914,7 +890,7 @@ extern "C" {
 			if (resolution.x > 0 && resolution.y > 0) {
 				frect view_rect = calculate_view_rect(resolution);
 			
-				graphics_id_t texture = graphics->get_render_target_texture(g_editor_target);
+				graphics_id_t texture = graphics->get_render_target_texture(g_editor_cam.render_target);
 				
 				ImGui::SetCursorPos(view_rect.pos);
 				ImGui::Image
@@ -925,7 +901,7 @@ extern "C" {
 					ImVec2(1, 0)
 				);
 
-				g_editor_ortho = mz::projection::ortho<float>((f32)-resolution.width / 2.f, (f32)resolution.width / 2.f, (f32)-resolution.height / 2.f, (f32)resolution.height / 2.f, -1, 1);
+				g_editor_cam.ortho = mz::projection::ortho<float>((f32)-resolution.width / 2.f, (f32)resolution.width / 2.f, (f32)-resolution.height / 2.f, (f32)resolution.height / 2.f, -1, 1);
 
 				is_game_hovered = ImGui::IsItemHovered();
 
@@ -941,8 +917,7 @@ extern "C" {
 				mouse_pos.x = (mouse_ratio.x) * (f32)resolution.x;
 				mouse_pos.y = (mouse_ratio.y) * (f32)resolution.y;
 
-				fmat4 cam_transform = g_editor_transform;
-				//cam_transform.translate(-graphics->get_render_target_size(g_editor_target) / 2.f);
+				fmat4 cam_transform = g_editor_cam.transform;
 				cam_transform.rows[2].w = -.5f;
 				fvec2 scale = { cam_transform.rows[0].x, cam_transform.rows[1].y };
 				fvec2 view_size = mz::transformation::scale<f32>(scale) * fvec4(resolution, 1, 1);
@@ -969,7 +944,7 @@ extern "C" {
 				}
 
 				if (is_panning) {
-					g_editor_transform.translate(mouse_move);
+					g_editor_cam.transform.translate(mouse_move);
 				}
 
 				auto windows = graphics->get_windows_context();
@@ -979,7 +954,18 @@ extern "C" {
 				f32 scroll = -ImGui::GetIO().MouseWheel * delta * 10;
 
 				if (scroll != 0 && is_game_hovered) {
-					g_editor_transform.scale(fvec2(scroll));
+					g_editor_cam.transform.scale(fvec2(scroll));
+				}
+
+				if (ImGui::IsKeyDown(AP_KEY_F) && is_any_entity_selected()) {
+					auto& first_selected = *get_selected_entities().begin();
+					if (reg.has<Transform2D>(first_selected)) {
+						auto& selected_transform = reg.get<Transform2D>(first_selected);
+						g_editor_cam.transform.rows[0].w = selected_transform.position.x;
+						g_editor_cam.transform.rows[1].w = selected_transform.position.y;
+						g_editor_cam.transform.rows[0].x = 2;
+						g_editor_cam.transform.rows[1].y = 2;
+					}
 				}
 				
 				if (ImGui::IsMouseClicked(0) && is_game_hovered) {
@@ -1011,7 +997,8 @@ extern "C" {
 
 					drag_start_positions.clear();
 					for (auto selected_entity : get_selected_entities()) {
-						drag_start_positions[selected_entity] = reg.get<Transform2D>(selected_entity).position;
+						if (reg.has<Transform2D>(selected_entity))
+							drag_start_positions[selected_entity] = reg.get<Transform2D>(selected_entity).position;
 					}
 				}
 
@@ -1036,7 +1023,7 @@ extern "C" {
 
 					if (is_game_hovered && ImGui::IsMouseDragging(0)) {
 						for (auto selected_entity : get_selected_entities()) {
-							if (!reg.valid(selected_entity)) continue;
+							if (!reg.valid(selected_entity) || !reg.has<Transform2D>(selected_entity)) continue;
 							auto& start_pos = drag_start_positions[selected_entity];
 							auto& selected_transform = reg.get<Transform2D>(selected_entity);
 
@@ -1049,13 +1036,18 @@ extern "C" {
 		}, flags);
 	}
 
-	_export void __cdecl on_gui(Graphics_Context* graphics, ImGuiContext* imgui_ctx) {
-
-		
-
-		ImGui::SetCurrentContext(imgui_ctx);
-		
+	_export void __cdecl on_gui(Graphics_Context* graphics) {
 		do_viewport_gui(graphics);
 		do_editor_view_gui(graphics);
+	}
+
+	_export void* __cdecl _request(void* preq) {
+		Ecs_2D_Renderer_Request& req = *(Ecs_2D_Renderer_Request*)preq;
+
+		if (req.type == ECS_2D_RENDERER_REQUEST_GET_EDITOR_VIEW) {
+			return &g_editor_cam;
+		}
+
+		return NULL;
 	}
 }

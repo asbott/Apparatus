@@ -4,12 +4,17 @@
 
 #include "module.h"
 
+#include "archive.h"
+
 #include <imgui.h>
 
+typedef str_t<256> entity_name_t;
+typedef str_t<128> comp_name_t;
 
+constexpr u32 MAX_COMPONENTS_PER_ENTITY = 256;
 
 struct Property_Info {
-	std::function<void(void*, ImGuiContext* ctx)> on_gui;
+	std::function<void(void*)> on_gui;
 
 	std::string name;
 	size_t size;
@@ -18,7 +23,7 @@ struct Property_Info {
 
 struct Entity_Info {
 	entt::entity id;
-	str_t<128> name;
+	entity_name_t name;
 };
 
 struct Component_Info {
@@ -56,7 +61,11 @@ struct Game_Input {
 };
 
 struct Gui_Window {
+	Gui_Window(bool open, str_ptr_t _name) : open(open) {
+		strcpy(name, _name);
+	}
 	bool open;
+	bool focused = false;
 	name_str_t name;
 };
 
@@ -87,13 +96,14 @@ namespace ImGui {
 	inline void DoGuiWindow(Gui_Window* wnd, const std::function<void()>& fn, ImGuiWindowFlags flags = ImGuiWindowFlags_None) {
 		if (wnd->open) {
 			ImGui::Begin(wnd->name, &wnd->open, flags);
+			wnd->focused = ImGui::IsWindowFocused();
 			fn();
 			ImGui::End();
 		}
 	}
 
 	AP_API void Icon(Icon_Type icon, mz::ivec2 size);
-	AP_API bool IconButton(Icon_Type icon, mz::ivec2 size);
+	AP_API bool IconButton(Icon_Type icon, mz::ivec2 size, const mz::color& bgr_color = 0);
 }
 
 struct Graphics_Context;
@@ -121,6 +131,11 @@ AP_API void select_entity(entt::entity entity);
 AP_API void deselect_entity(entt::entity entity);
 AP_API void deselect_all_entities();
 AP_API bool is_entity_selected(entt::entity entity);
+AP_API bool is_any_entity_selected();
 AP_API const Hash_Set<entt::entity>& get_selected_entities();
+
+AP_API str_ptr_t get_user_directory();
+
+AP_API bool is_playing();
 
 AP_API int start(int argc, char** argv);

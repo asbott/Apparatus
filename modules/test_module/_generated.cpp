@@ -11,8 +11,7 @@ Hash_Map<std::string, uintptr_t> name_id_map;
 Hash_Map<uintptr_t, Component_Info> component_info;
 
 template <typename type_t>
-void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
-    ImGui::SetCurrentContext(ctx);
+void do_gui(const std::string& name, type_t* data) {
 
     std::string label = name;
 
@@ -45,36 +44,36 @@ extern "C" {
 	__declspec(dllexport) void __cdecl init() {
 
         {
-            uintptr_t id = (uintptr_t)typeid(WASDMovement).name();
+            uintptr_t id = (uintptr_t)typeid(BallMovement).name();
             runtime_ids.emplace(id);
-            name_id_map["WASDMovement"] = id;
+            name_id_map["BallMovement"] = id;
             component_info[id] = {
                 [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<WASDMovement>(entity);
+                    return &reg.emplace<BallMovement>(entity);
                 },
                 [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<WASDMovement>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<WASDMovement>(entity);
+                    if (!reg.has<BallMovement>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<BallMovement>(entity);
                 }, 
                 [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<WASDMovement>(entity);
+                    reg.remove<BallMovement>(entity);
                 },
             
-                "WASDMovement",
+                "BallMovement",
                 id,
                 false,
                 std::vector<Property_Info> {
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<f32>("hspeed", (f32*)data, ctx);
+                        [](void* data) {
+                            do_gui<f32>("hforce", (f32*)data);
                         },
-                        "hspeed",
+                        "hforce",
                         sizeof(f32),
                         0,
                     },
                     Property_Info { 
-                        [](void* data, ImGuiContext* ctx) {
-                            do_gui<f32>("jump_force", (f32*)data, ctx);
+                        [](void* data) {
+                            do_gui<f32>("jump_force", (f32*)data);
                         },
                         "jump_force",
                         sizeof(f32),
@@ -112,6 +111,10 @@ extern "C" {
             return name_id_map[name];
         else
             return 0;
+    }
+
+    __declspec(dllexport) void __cdecl set_imgui_context(ImGuiContext* ctx) {
+        ImGui::SetCurrentContext(ctx);
     }
 
 }

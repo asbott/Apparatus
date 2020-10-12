@@ -12,7 +12,7 @@ struct Module {
     typedef void (__cdecl *on_unload_t)(Graphics_Context*); 
     typedef void (__cdecl *on_update_t)(float); 
     typedef void (__cdecl *on_render_t)(Graphics_Context*); 
-    typedef void (__cdecl *on_gui_t)(Graphics_Context*, ImGuiContext*); 
+    typedef void (__cdecl *on_gui_t)(Graphics_Context*); 
 
     typedef void (__cdecl *on_play_begin_t)(); 
     typedef void (__cdecl *on_play_stop_t)(); 
@@ -27,6 +27,8 @@ struct Module {
     typedef void* (__cdecl *get_component_t)(uintptr_t, entt::registry&, entt::entity); 
     typedef void (__cdecl *remove_component_t)(uintptr_t, entt::registry&, entt::entity); 
     typedef uintptr_t (__cdecl *get_component_id_t)(const std::string&); 
+
+    typedef void (__cdecl *set_imgui_context_t)(ImGuiContext*);
 
     typedef void* (__cdecl *_request_t)(void* ud);
 
@@ -50,18 +52,20 @@ struct Module {
     remove_component_t   remove_component   = NULL;
     get_component_id_t   get_component_id   = NULL;
 
+    set_imgui_context_t  set_imgui_context = NULL;
+
     bool is_loaded = false;
 
     _request_t _request = NULL;
 
     Module(path_str_t mod_path, path_str_t mod_path_new, name_str_t str_id = "unnamed");
 
-    template <typename type_t>
-    inline type_t request(void* ud) {
+    template <typename ret_type_t, typename req_type_t>
+    inline ret_type_t request(req_type_t& req) {
         if (this->_request) {
-            return (type_t)_request(ud);
+            return (ret_type_t)_request(&req);
         }
-        if constexpr (!std::is_same<type_t, void>())
+        if constexpr (!std::is_same<ret_type_t, void>())
             return 0;
     }
 

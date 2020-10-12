@@ -169,6 +169,9 @@ namespace Path {
         else 
             strcpy(out, prefix);
     }
+    bool has_extension(str_ptr_t path) {
+        return fs::path(path).has_extension();
+    }
     void directory_of(str_ptr_t path, char* out) {
         if (path[0] == '.') {
             strcpy(out, "");
@@ -184,7 +187,7 @@ namespace Path {
         }
     }
     void iterate_directories(str_ptr_t path, const std::function<void(str_ptr_t)> fn, bool recursive) {
-
+        if (!Path::exists(path)) return;
         if (recursive) {
             fs::recursive_directory_iterator it(path);
             for (auto entry : it) {

@@ -10,8 +10,7 @@ Hash_Map<std::string, uintptr_t> name_id_map;
 Hash_Map<uintptr_t, Component_Info> component_info;
 
 template <typename type_t>
-void do_gui(const std::string& name, type_t* data, ImGuiContext* ctx) {
-    ImGui::SetCurrentContext(ctx);
+void do_gui(const std::string& name, type_t* data) {
 
     std::string label = name;
 
@@ -72,6 +71,10 @@ extern "C" {
             return name_id_map[name];
         else
             return 0;
+    }
+
+    __declspec(dllexport) void __cdecl set_imgui_context(ImGuiContext* ctx) {
+        ImGui::SetCurrentContext(ctx);
     }
 
 }

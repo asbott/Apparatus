@@ -58,14 +58,21 @@ Game_Input game_input_state;
 
 Hash_Set<entt::entity> g_selected_entities;
 
+bool g_is_playing = false;
+
+path_str_t g_user_dir = "";
+
 namespace ImGui {
 	void Icon(Icon_Type icon, mz::ivec2 size) {
         auto native = g_graphics->get_native_texture_handle(icons[icon]);
         ImGui::Image(native, size);
     }
-	bool IconButton(Icon_Type icon, mz::ivec2 size) {
+	bool IconButton(Icon_Type icon, mz::ivec2 size, const mz::color& bgr_color) {
         auto native = g_graphics->get_native_texture_handle(icons[icon]);
-        return ImGui::ImageButton(native, size);
+        if (bgr_color != mz::color(0)) ImGui::PushStyleColor(ImGuiCol_Button, bgr_color);
+        bool pressed = ImGui::ImageButton(native, size, {0,0}, {1,1}, -1);
+        if (bgr_color != mz::color(0)) ImGui::PopStyleColor();
+        return pressed;
     }
 }
 
@@ -160,174 +167,200 @@ void deselect_all_entities() {
 bool is_entity_selected(entt::entity entity) {
     return g_selected_entities.count(entity) > 0;
 }
+bool is_any_entity_selected() {
+    return g_selected_entities.size() > 0;
+}
 const Hash_Set<entt::entity>& get_selected_entities() {
     return g_selected_entities;
 }
 
-void to_file(entt::registry& reg, str_ptr_t path) {
-    std::stringstream ss;
-
-    reg.each([&reg, &path, &ss](entt::entity entity){
-        if (!reg.has<Entity_Info>(entity)) return;
-        auto& entity_info = reg.get<Entity_Info>(entity);
-        ss << "$entity_begin\n";
-        ss << "$name " << entity_info.name << "\n";
-        for (auto mod : g_modules) {
-            if (!mod->is_loaded) continue;
-            for (auto component_id : mod->get_component_ids()) {
-                if (auto* data = (byte*)mod->get_component(component_id, reg, entity)) {
-                    ss << "$component_begin\n";
-                    const auto& info = mod->get_component_info(component_id);
-                    ss << "$name " << info->name << "\n";
-                    for (auto& prop : info->properties) {
-                        ss << "$property_begin\n";
-                        ss << "$name " << prop.name << "\n";
-                        ss << "$bytes ";
-                        for (int i = 0; i < prop.size; i++) {
-                            ss << (int)data[prop.offset + i] << " ";
-                        }
-                        ss << "\n";
-                        ss << "$property_end\n";
-                    }
-                    ss << "$component_end\n";
-                }
-            }
-        }
-        ss << "$entity_end\n";
-
-    });
-
-    Dynamic_String dstring = ss.str();
-    str_ptr_t str = dstring.c_str();
-
-    Path::write_bytes(path, (byte*)str, strlen(str) + 1);
+str_ptr_t get_user_directory() {
+    return g_user_dir;   
 }
 
-void from_file(entt::registry& reg, str_ptr_t path) {
-    File_Info file_info;
-    Path::get_info(path, &file_info);
+bool is_playing() {
+    return g_is_playing;
+}
 
-    char* buffer = (char*)malloc(file_info.size);
+void to_file(entt::registry& reg, str_ptr_t dir_path) {
+    
+    Path::create_directory(dir_path);
+    reg.view<Entity_Info>().each([&reg, &dir_path](entt::entity entity, Entity_Info& entity_info) {
+        path_str_t file_path = "";
+        sprintf(file_path, "%s/%s", dir_path, entity_info.name);
+        Binary_Archive entity_archive(file_path);
 
-    Path::read_all_bytes(path, (byte*)buffer, file_info.size);
+        entity_archive.write("name", entity_info.name);
+        size_t ncomponents = 0;
+        for (auto* mod : g_modules) {
+            if (!mod->is_loaded) continue;
+            auto& ids = mod->get_component_ids();
+            for (auto comp_id : ids) {
+                if (!mod->has_component(comp_id, reg, entity)) continue;
+                ncomponents++;
+                const auto& info = mod->get_component_info(comp_id);
+                path_str_t comp_file_path = "";
+                sprintf(comp_file_path, "%s/%s.%s", dir_path, entity_info.name, info->name.c_str());
 
-    constexpr u32 LEVEL_NONE = 0;
-    constexpr u32 LEVEL_ENTITY = 1;
-    constexpr u32 LEVEL_COMPONENT = 2;
-    constexpr u32 LEVEL_PROPERTY = 3;
+                str_t<sizeof("component_") + 1> id = "";
+                sprintf(id, "component_%llu", ncomponents);
+                entity_archive.write(id, comp_file_path);
 
-    constexpr u32 ACTION_NONE = 0;
-    constexpr u32 ACTION_SETTING_NAME = 1;
-    constexpr u32 ACTION_SETTING_BYTES = 2;
-
-    u32 level = LEVEL_NONE;
-    u32 action = ACTION_NONE;
-
-    entt::entity entity = entt::null;
-    Dynamic_Array<byte> bytes;
-    uintptr_t component_id = 0;
-    Module* component_module = NULL;
-
-    int word_start = 0;
-    name_str_t word = "";
-    for (int i = 0; i < file_info.size; i++) {
-        if (buffer[i] == ' ' || buffer[i] == '\n' || buffer[i] == '\r\n' || buffer[i] == '\r') {
-            memset(word, 0, sizeof(name_str_t));
-            memcpy(word, buffer + word_start, i - word_start);
-            i++;
-            
-            if (level != LEVEL_NONE) {
-                if (strcmp(word, "$name") == 0) {
-                    action = ACTION_SETTING_NAME;
-                    word_start = i;
-                    continue;
+                Binary_Archive comp_archive(comp_file_path);
+                for (const auto& prop : info->properties) {
+                    entity_name_t prop_name = "";
+                    strcpy(prop_name, prop.name.c_str());
+                    byte* comp = (byte*) mod->get_component(comp_id, reg, entity);
+                    comp_archive.write(prop_name, comp + prop.offset, prop.size);
                 }
-                if (strcmp(word, "$bytes") == 0) {
-                    action = ACTION_SETTING_BYTES;
-                    word_start = i;
-                    continue;
-                }
+                comp_archive.flush();
             }
-
-            if (level == LEVEL_NONE) {
-                if (strcmp(word, "$entity_begin") == 0) {
-                    level++;
-                    entity = reg.create();
-                    reg.emplace<Entity_Info>(entity).id = entity;
-                }
-
-            } else if (level == LEVEL_ENTITY) {
-                if (strcmp(word, "$component_begin") == 0) level++;
-                if (strcmp(word, "$entity_end") == 0) level--;
-
-                if (action == ACTION_SETTING_NAME) {
-                    strcpy(reg.get<Entity_Info>(entity).name, word);
-                    action = ACTION_NONE;
-                }
-
-            } else if (level == LEVEL_COMPONENT) {
-                if (strcmp(word, "$property_begin") == 0) level++;
-                if (strcmp(word, "$component_end") == 0) {
-                    if (component_id) {
-                        const auto& info = component_module->get_component_info(component_id);
-                        byte* comp = (byte*)component_module->create_component(component_id, reg, entity);
-                        size_t comp_size = 0;
-                        for (auto& prop : info->properties) comp_size += prop.size;
-                        if (comp_size == bytes.size()) {
-                            size_t bytes_consumed = 0;
-                            for (auto& prop : info->properties) {
-                                memcpy(comp + prop.offset, &bytes[bytes_consumed], prop.size);
-                                bytes_consumed += prop.size;
-                            }
-                        } else {
-                            log_warn("Data mismatch when loading component {} on entity {}", 
-                            info->name, reg.get<Entity_Info>(entity).name);
-                        }
-                        bytes.clear();
-                        component_id = 0;
-                        component_module = NULL;
-                    }
-                    level--;
-                }
-
-                if (action == ACTION_SETTING_NAME) {
-                    action = ACTION_NONE;
-                    for (auto mod : g_modules) {
-                        if (!mod->is_loaded) continue;
-                        if (auto id = mod->get_component_id(word)) {
-                            component_module = mod;
-                            component_id = id;
-                            break;
-                        }
-                    }
-                }
-                
-            } else if (level == LEVEL_PROPERTY) {
-                if (strcmp(word, "$property_end") == 0) level--;
-
-                if (action == ACTION_SETTING_BYTES) {
-                    action = ACTION_NONE;
-                    bytes.push_back((byte)std::stoi(word));
-                    str_t<4> byte_str = "";
-                    int byte_start = i;
-                    while (buffer[i] != '\n' && buffer[i] != '\r' && buffer[i] != '\r\n') {
-                        if (buffer[i] == ' ') {
-                            memset(byte_str, 0, sizeof(byte_str));
-                            memcpy(byte_str, buffer + byte_start, i - byte_start);
-                            bytes.push_back((byte)std::stoi(byte_str));
-                            byte_start = i + 1;
-                        }
-                        i++;
-                    }
-                    word_start = i++;
-                }
-            }
-            word_start = i;
         }
+        entity_archive.write("ncomponents", ncomponents);
+
+        entity_archive.flush();
+    });
+}
+
+void from_file(entt::registry& reg, str_ptr_t dir_path) {
+    Path::iterate_directories(dir_path, [&reg](str_ptr_t entry) {
+        if (Path::is_file(entry) && !Path::has_extension(entry)) {
+            entity_name_t entity_name = "";
+            Path::name_without_extension(entry, entity_name);
+
+            entt::entity entity = reg.create();
+            auto& entity_info = reg.emplace<Entity_Info>(entity);
+            strcpy(entity_info.name, entity_name);
+            entity_info.id = entity;
+
+            Binary_Archive entity_archive(entry);
+
+            if (!entity_archive.is_valid_id("ncomponents")) return;
+
+            size_t ncomponents = entity_archive.read<size_t>("ncomponents");
+
+            for (size_t i = 0; i < ncomponents; i++) {
+                str_t<sizeof("component_") + 1> id = "";
+                sprintf(id, "component_%llu", i + 1);
+
+                if (entity_archive.is_valid_id(id)) {
+                    str_ptr_t comp_path = entity_archive.read<path_str_t>(id);
+
+                    path_str_t comp_name = "";
+                    Path::extension_of(comp_path, comp_name);
+                    void* comp = NULL;
+                    uintptr_t comp_id = 0;
+                    Module* comp_mod = NULL;
+                    for (auto* mod : g_modules) if (mod->is_loaded && mod->get_component_id(comp_name)) {
+                        comp_id = mod->get_component_id(comp_name);
+                        comp = mod->create_component(comp_id, reg, entity);
+                        comp_mod = mod;
+                        break;
+                    } 
+
+                    if (!comp || !comp_id) continue;
+
+                    Binary_Archive comp_archive(comp_path);
+
+                    comp_archive.iterate([&comp_id, comp_mod, &comp, &comp_archive](str_ptr_t id) {
+                        const auto& comp_info = comp_mod->get_component_info(comp_id);
+
+                        for (auto& prop : comp_info->properties) {
+                            if (strcmp(prop.name.c_str(), id) == 0) {
+                                size_t actual_size = 0;
+                                auto data = comp_archive.read(id, &actual_size);
+                                if (actual_size > prop.size) actual_size = prop.size;
+                                memcpy((byte*)comp + prop.offset, data, actual_size);
+                            } 
+                        }
+
+                        return true;
+                    });
+                }
+            }
+        }
+    }, false);
+}
+
+s32 filter(u32 code, _EXCEPTION_POINTERS *ep, str_ptr_t mod_name, str_ptr_t mod_fn) {
+    (void)ep;
+    str_ptr_t descr = "";
+    switch (code) {
+        case EXCEPTION_ACCESS_VIOLATION:         descr = "Access violation (Dereference nullptr? Touch garbage memory?)"; break;
+        case EXCEPTION_DATATYPE_MISALIGNMENT:    descr = "Datatype missalignment"; break;
+        case EXCEPTION_BREAKPOINT:               descr = "Breakpoint"; break;
+        case EXCEPTION_SINGLE_STEP:              descr = "Single step"; break;
+        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:    descr = "Array bounds exceeded"; break;
+        case EXCEPTION_FLT_DENORMAL_OPERAND:     descr = "Float denormal operand"; break;
+        case EXCEPTION_FLT_DIVIDE_BY_ZERO:       descr = "Float division by zero"; break;
+        case EXCEPTION_FLT_INEXACT_RESULT:       descr = "Float inexact result"; break;
+        case EXCEPTION_FLT_INVALID_OPERATION:    descr = "Float invalid operation"; break;
+        case EXCEPTION_FLT_OVERFLOW:             descr = "Float overflow"; break;
+        case EXCEPTION_FLT_STACK_CHECK:          descr = "Float stack check fail"; break;
+        case EXCEPTION_FLT_UNDERFLOW:            descr = "Float underflow"; break;
+        case EXCEPTION_INT_DIVIDE_BY_ZERO:       descr = "Integer division by zero"; break;
+        case EXCEPTION_INT_OVERFLOW:             descr = "Integer overflow"; break;
+        case EXCEPTION_PRIV_INSTRUCTION:         descr = "Priv instruction"; break;
+        case EXCEPTION_IN_PAGE_ERROR:            descr = "In page error"; break;
+        case EXCEPTION_NONCONTINUABLE_EXCEPTION: descr = "Noncontinuable expection"; break;
+        case EXCEPTION_ILLEGAL_INSTRUCTION:      descr = "Illegal instruction"; break;
+        case EXCEPTION_STACK_OVERFLOW:           descr = "Stack overflow (Infinite recursion? Large function argument/stack variable?)"; break;
+        case EXCEPTION_INVALID_DISPOSITION:      descr = "Invalid disposition"; break;
+        case EXCEPTION_GUARD_PAGE:               descr = "Guard page"; break;
+        case EXCEPTION_INVALID_HANDLE:           descr = "Invalid handle"; break;
+        default:                                 descr = "N/A"; break;
     }
 
-    free(buffer);
+    log_error("System level exception thrown\nException: {} ({})\nException address: {}\nIn module '{}'\nIn function '{}'",
+        descr, code, (uintptr_t)ep->ExceptionRecord->ExceptionAddress, mod_name, mod_fn);
+    return EXCEPTION_EXECUTE_HANDLER;
 }
+
+template <typename ...T>
+void __ignore(T && ...)
+{ }
+
+#define invoke_mod_function(mod, fn, ret_t, ...) if (mod->fn) _invoke_mod_function<ret_t>(mod->fn, mod->str_id, #fn, __VA_ARGS__)
+template <typename ret_t, typename fn_t, typename ...arg_t>
+ret_t _invoke_mod_function(fn_t fn, str_ptr_t mod_name, str_ptr_t fn_name, arg_t&... args) {
+    __try {
+        return fn(args...);
+    } __except(filter(GetExceptionCode(), GetExceptionInformation(), mod_name, fn_name)) {
+        if constexpr (std::is_same<void, ret_t>()) {
+            return;
+        } else {
+            return 0;
+        }
+    }
+}
+
+void save_user_settings(str_ptr_t dir) {
+    path_str_t user_file = "";
+    sprintf(user_file, "%s/window_states", dir);
+    Binary_Archive archive(user_file);
+    for (auto gui_wnd : gui_windows) {
+        archive.write<Gui_Window>(gui_wnd->name, *gui_wnd);
+    }
+    archive.flush();
+}
+
+void load_user_settings(str_ptr_t dir) {
+    path_str_t user_file = "";
+    sprintf(user_file, "%s/window_states", dir);
+    Binary_Archive archive(user_file);
+    for (auto gui_wnd : gui_windows) {
+        if (!archive.is_valid_id(gui_wnd->name)) continue;
+        *gui_wnd = archive.read<Gui_Window>(gui_wnd->name);
+
+        if (gui_wnd->focused) {
+            ImGui::SetWindowFocus(gui_wnd->name);
+        }
+    }
+    archive.flush();
+}
+
+
+
 
 int start(int argc, char** argv) {
     (void)argc;
@@ -354,19 +387,37 @@ int start(int argc, char** argv) {
     log_trace("Exe path: {}\nExe dir:  {}\nExe ext:  {}\nExe name: {}, {}",
         exe, get_executable_directory(), ext, name_with, name_without);
 
+    sprintf(g_user_dir, "%s/../../.user", get_executable_directory());
+
     path_str_t project_dir = "";
-    sprintf(project_dir, "%s/../..", get_executable_directory());
+    sprintf(project_dir, "%s/../../test_project", get_executable_directory());
     Path::to_absolute(project_dir, project_dir);
 
     path_str_t ecs_path = "";
     sprintf(ecs_path, "%s/ecs", project_dir);
+
     path_str_t style_path = "";
-    sprintf(style_path, "%s/style", project_dir);
+    sprintf(style_path, "%s/style", g_user_dir);
 
     path_str_t essential_dir = "";
     sprintf(essential_dir, "%s/../../essential", get_executable_directory());
 
+    
+
     log_trace("ecs_path: {}", ecs_path);
+
+    //Binary_Archive archive("test_archive");
+    //int a = 1, b = 2, c = INT_MAX;
+    /*str_t<128> str = "U mom";
+    archive.write("a", &a, sizeof(int));
+    archive.write("b", &b, sizeof(int));
+    archive.write("c", &c, sizeof(int));
+    archive.write("str", str, strlen(str) + 1);*/
+
+    /*log_trace("a:   {}\n b:   {}\n c:   {}\nstr: {}", 
+               archive.read<int>("a"), archive.read<int>("b"),
+               archive.read<int>("c"), archive.read<str_t<6>>("str"));*/
+
 
     register_gui_window(&scene_inspector);
     register_gui_window(&entity_inspector);
@@ -379,8 +430,8 @@ int start(int argc, char** argv) {
     add_component_popup.fn = [](){
         for (auto* mod : g_modules)  {
             if (!mod->is_loaded) continue;
-            if (ImGui::CollapsingHeader(mod->str_id)) {
-                const auto& ids = mod->get_component_ids();
+            const auto& ids = mod->get_component_ids();
+            if (ids.size() > 0 && ImGui::CollapsingHeader(mod->str_id)) {
                 for (auto id : ids) {
                     const auto& info = mod->get_component_info(id);
                     if (g_selected_entities.size() == 1) {
@@ -436,6 +487,7 @@ int start(int argc, char** argv) {
     register_module("ecs_2d_renderer");
     register_module("asset_manager");
     register_module("2d_physics");
+    register_module("2d_particles_simulator");
 
     for (auto* mod : g_modules) {
         log_trace("Loading module '{}'", mod->str_id);
@@ -445,15 +497,13 @@ int start(int argc, char** argv) {
             log_error("Failed loading module '{}'", mod->str_id);
         }
 
-        if (mod->on_load) mod->on_load(g_graphics);
-        if (mod->init) mod->init();
+        invoke_mod_function(mod, on_load, void, g_graphics);
+        invoke_mod_function(mod, init, void);
     }
 
     if (Path::exists(ecs_path)) {
         from_file(g_reg, ecs_path);
     }
-
-    bool is_playing = false;
 
     path_str_t font_path = "";
     sprintf(font_path, "%s/input_mono.ttf", essential_dir);
@@ -461,8 +511,37 @@ int start(int argc, char** argv) {
     cfg.OversampleH = 8;
     cfg.OversampleV = 8;
     cfg.RasterizerMultiply = 1.f;
-    auto* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 16, &cfg);
-    ImGui::GetIO().FontDefault = font;
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
+    ImGui::GetIO().Fonts->AddFontDefault();
+
+    sprintf(font_path, "%s/louis_george.ttf", essential_dir);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
+    ImGui::GetIO().FontDefault = ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
+
+    /*sprintf(font_path, "%s/comfortaa_regular.ttf", essential_dir);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
+
+    sprintf(font_path, "%s/jack_input.ttf", essential_dir);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
+
+    sprintf(font_path, "%s/keep_calm.ttf", essential_dir);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);*/
+    
+    ImGui::GetIO().Fonts->Build();
 
     load_icon(ICON_TYPE_STOP,    essential_dir, "stop_icon.png");
     load_icon(ICON_TYPE_PLAY,    essential_dir, "play_icon.png");
@@ -471,7 +550,14 @@ int start(int argc, char** argv) {
     load_icon(ICON_TYPE_FOLDER,  essential_dir, "vendor/folder_icon.png");
     load_icon(ICON_TYPE_FILE,    essential_dir, "file_icon.png");
 
-    for (auto* mod : g_modules) if (mod->load_from_disk) mod->load_from_disk(project_dir);
+    path_str_t ini_path = "";
+    sprintf(ini_path, "%s/imgui.ini", g_user_dir);
+    ImGui::GetIO().IniFilename = ini_path;
+
+    for (auto* mod : g_modules) invoke_mod_function(mod, load_from_disk, void, project_dir);
+    load_user_settings(g_user_dir);
+
+    
 
     while (g_running) {
         
@@ -489,8 +575,8 @@ int start(int argc, char** argv) {
         float delta = (f32)windows->window_info[wnd].delta_time;
 
         
-        if (is_playing) {
-            for (auto* mod : g_modules) if (mod->on_update) mod->on_update(delta);
+        if (g_is_playing) {
+            for (auto* mod : g_modules) invoke_mod_function(mod, on_update, void, delta);
         }
 
         log_context.do_gui(&log_window);
@@ -549,10 +635,13 @@ int start(int argc, char** argv) {
             }
         });
 
-        for (auto* mod : g_modules) if (mod->on_render) mod->on_render(g_graphics);
+        for (auto* mod : g_modules) invoke_mod_function(mod, on_render, void, g_graphics);
 
         ImGui::UseGraphicsContext(g_graphics);
-        for (auto* mod : g_modules) if (mod->on_gui) mod->on_gui(g_graphics, ImGui::GetCurrentContext());    
+        for (auto* mod : g_modules) {
+            mod->set_imgui_context(ImGui::GetCurrentContext());
+            invoke_mod_function(mod, on_gui, void, g_graphics);
+        }
         
         static f32 bar_width = (f32)windows->window_info[wnd].size.width;
         static f32 bar_height = 32.f;
@@ -574,25 +663,27 @@ int start(int argc, char** argv) {
         bool want_invoke_on_play_stop   = false;
 
         ImGui::Indent(ImGui::GetWindowWidth() / 2.f - 16);
-        bool toggle_play = ImGui::IconButton(is_playing ? ICON_TYPE_STOP : ICON_TYPE_PLAY, { 32, 32 });
-        bar_height = ImGui::GetItemRectSize().y / 2.f - ImGui::GetStyle().FramePadding.y * 2 -3;
+        bool toggle_play = ImGui::IconButton((g_is_playing ? ICON_TYPE_STOP : ICON_TYPE_PLAY), { 32, 32 }, ImGui::GetStyleColorVec4(ImGuiCol_MenuBarBg));
+        bar_height = ImGui::GetItemRectSize().y * 0.4f;
         if (toggle_play) {
-            if (!is_playing) {
+            if (!g_is_playing) {
                 to_file(g_reg, ecs_path);
-                for (auto mod : g_modules) if (mod->save_to_disk) mod->save_to_disk(project_dir);
+                for (auto mod : g_modules) invoke_mod_function(mod, save_to_disk, void, project_dir);
                 ImGui::SaveStyleToDisk(style_path);
                 g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_begin = true;
             } else {
                 g_reg.clear();
+                deselect_all_entities();
                 from_file(g_reg, ecs_path);
-                for (auto mod : g_modules) if (mod->load_from_disk) mod->load_from_disk(project_dir);
+                for (auto mod : g_modules) invoke_mod_function(mod, load_from_disk, void, project_dir);
+                load_user_settings(g_user_dir);
                 ImGui::LoadStyleFromDisk(style_path);
                 g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_stop = true;
             }
 
-            is_playing = !is_playing;
+            g_is_playing = !g_is_playing;
         }
  
         ImGui::EndMainMenuBar();
@@ -669,12 +760,13 @@ int start(int argc, char** argv) {
                                 }
                                 ImGui::PopID();
 
+                                mod->set_imgui_context(ImGui::GetCurrentContext());
                                 if (component_opened) {
                                     if (info->has_custom_gui && info->properties.size() > 0) {
-                                        info->properties[0].on_gui(comp, ImGui::GetCurrentContext());
+                                        info->properties[0].on_gui(comp);
                                     } else {
                                         for (const auto& prop : info->properties) {
-                                            prop.on_gui((byte*)comp + prop.offset, ImGui::GetCurrentContext());
+                                            prop.on_gui((byte*)comp + prop.offset);
                                         }
                                     }
 
@@ -716,8 +808,14 @@ int start(int argc, char** argv) {
 
         g_graphics->render_imgui();
 
-        if (want_invoke_on_play_begin) for (auto* mod : g_modules) if (mod->on_play_begin) mod->on_play_begin();
-        if (want_invoke_on_play_stop)  for (auto* mod : g_modules) if (mod->on_play_stop)  mod->on_play_stop();
+        if (want_invoke_on_play_begin) {
+            save_user_settings(g_user_dir);
+            for (auto* mod : g_modules) invoke_mod_function(mod, on_play_begin, void);
+        }
+        if (want_invoke_on_play_stop) {
+            for (auto* mod : g_modules) invoke_mod_function(mod, on_play_stop, void);
+            load_user_settings(g_user_dir);
+        }
 
         // Swap the buffers in swap chain
         windows->swap_buffers(wnd);

@@ -19,7 +19,7 @@ Editor viewport & interactions (click to select, drag, multiselect)
 Multiple cameras
 ![](repo/multiplecameras.gif)
 
-Runtime c++ compiling (hot reloading modules), language extension & introspection. Say no to scripting.
+Runtime c++ compiling (hot reloading modules), language extension & introspection. Say no to scripting. Just pure C++ code.
 ![](repo/runtimecpp.gif)
 
 Entt api for gameplay programming in modules

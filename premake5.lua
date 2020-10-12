@@ -16,6 +16,7 @@ workspace "apparatus"
 
 
     filter "system:windows"
+        exceptionhandling "SEH"
         configurations {
             "Debug_OpenGL45", "Test64_OpenGL45", "Release64_OpenGL45",
             "Debug_DirectX11", "Test64_DirectX11", "Release64_DirectX11",
@@ -51,7 +52,7 @@ workspace "apparatus"
         defines  { "_CONFIG_RELEASE", "_AP_DISABLE_ASSERTS", "NDEBUG" }
         runtime  "Release"
         symbols  "Off"
-        optimize "Full"
+        optimize "Speed"
         floatingpoint "Fast"
 
     filter "configurations:*DirectX11"
@@ -155,6 +156,8 @@ workspace "apparatus"
     make_module "asset_manager"
 
     make_module "2d_physics"
+
+    make_module "2d_particles_simulator"
 
     project "launcher"
         kind "ConsoleApp"

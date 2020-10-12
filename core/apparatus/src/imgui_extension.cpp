@@ -150,6 +150,13 @@ namespace ImGui {
         PopID();
         return ret;
     }
+    bool RDragFloatRange2(const char* label, mz::fvec2* v_current_minmax, float v_speed, float v_min, float v_max, const char* format, const char* format_max, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v_current_minmax);
+        bool ret = DragFloatRange2("", &v_current_minmax->min, &v_current_minmax->max, v_speed, v_min, v_max, format, format_max, flags);
+        PopID();
+        return ret;
+    }
     bool RDragInt(const char* label, int* v, float v_speed, int v_min, int v_max, const char* format, ImGuiSliderFlags flags) {
         set_layout(label);
         PushID(v);
@@ -182,6 +189,13 @@ namespace ImGui {
         set_layout(label);
         PushID(v_current_min);
         bool ret = DragIntRange2("", v_current_min, v_current_max, v_speed, v_min, v_max, format, format_max, flags);
+        PopID();
+        return ret;
+    }
+    bool RDragIntRange2(const char* label, mz::ivec2* v_current_minmax, float v_speed, s32 v_min, s32 v_max, const char* format, const char* format_max, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v_current_minmax);
+        bool ret = DragIntRange2("", &v_current_minmax->min, &v_current_minmax->max, v_speed, v_min, v_max, format, format_max, flags);
         PopID();
         return ret;
     }

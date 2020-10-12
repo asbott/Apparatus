@@ -46,6 +46,8 @@ bool Module::load() {
     _mod_load_fn(remove_component);
     _mod_load_fn(get_component_id);
 
+    _mod_load_fn(set_imgui_context);
+
     _mod_load_fn(_request);
 
     is_loaded = true;
