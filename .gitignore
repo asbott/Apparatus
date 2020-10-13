@@ -11,3 +11,7 @@ lib
 .vscode/
 
 *.hint
+
+*.log_output.txt
+
+!.user

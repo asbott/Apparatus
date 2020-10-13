@@ -51,6 +51,7 @@ Gui_Window style_editor = { false, "Style Editor" };
 
 Gui_Popup add_component_popup;
 Gui_Popup manage_component_popup;
+Gui_Popup file_browser_popup;
 
 Log_Context log_context;
 
@@ -61,6 +62,13 @@ Hash_Set<entt::entity> g_selected_entities;
 bool g_is_playing = false;
 
 path_str_t g_user_dir = "";
+path_str_t g_style_path = "";
+
+path_str_t g_ecs_dir = "";
+path_str_t g_project_dir = "";
+
+path_str_t g_browse_dir = "";
+File_Browser_Mode g_browse_mode;
 
 namespace ImGui {
 	void Icon(Icon_Type icon, mz::ivec2 size) {
@@ -178,6 +186,15 @@ str_ptr_t get_user_directory() {
     return g_user_dir;   
 }
 
+void open_file_browser(File_Browser_Mode mode, std::function<void(str_ptr_t)> result_callback) {
+    g_browse_mode = mode;
+    file_browser_popup.should_open = true;
+    if (g_browse_mode != File_Browser_Mode::file) strcpy(file_browser_popup.return_value, g_browse_dir);
+    file_browser_popup.done_fn = [result_callback]() {
+        if (result_callback) result_callback(file_browser_popup.return_value);
+    };
+}
+
 bool is_playing() {
     return g_is_playing;
 }
@@ -283,7 +300,7 @@ void from_file(entt::registry& reg, str_ptr_t dir_path) {
 }
 
 s32 filter(u32 code, _EXCEPTION_POINTERS *ep, str_ptr_t mod_name, str_ptr_t mod_fn) {
-    (void)ep;
+    (void)ep; (void)mod_name; (void)mod_fn;
     str_ptr_t descr = "";
     switch (code) {
         case EXCEPTION_ACCESS_VIOLATION:         descr = "Access violation (Dereference nullptr? Touch garbage memory?)"; break;
@@ -359,8 +376,193 @@ void load_user_settings(str_ptr_t dir) {
     archive.flush();
 }
 
+void do_file_browser_gui() {
+    #ifdef _OS_WINDOWS
+    str_t<3> current_disk = "  ";
+    current_disk[0] = g_browse_dir[0];
+    current_disk[1] = g_browse_dir[1];
+    if (ImGui::RBeginCombo("Disk", current_disk)) {
 
+        for (char c = 'A'; c <= 'Z'; c++) {
+            str_t<3> disk = "  ";
+            disk[0] = c;
+            disk[1] = ':';
+            str_t<4> disk_path;
+            sprintf(disk_path, "%s/", disk);
+            if (!Path::exists(disk_path)) continue;
+            bool is_current = strcmp(disk, current_disk) == 0;
+            if (ImGui::MenuItem(disk, NULL, is_current)) {
+                if (!is_current) {
+                    sprintf(g_browse_dir, "%s/", disk);
+                }
+            }
+        }
 
+        ImGui::REndCombo();
+    }
+    #endif // _OS_WINDOWS
+
+    path_str_t prev_dir = "";
+    Path::directory_of(g_browse_dir, prev_dir);
+    
+    static Dynamic_Array<Dynamic_String> dirs_ordered;
+    while (Path::exists(prev_dir)) {
+        dirs_ordered.push_back(prev_dir);
+        str16_t root = "";
+        Path::root_name(g_browse_dir, root);
+        if (strcmp(root, prev_dir) == 0) break;
+        Path::directory_of(prev_dir, prev_dir);
+    }
+
+    for (int i = (int)dirs_ordered.size() - 1; i >= 0; i--) {
+        path_str_t name;
+        Path::name_with_extension(dirs_ordered[i].c_str(), name);
+        if (ImGui::Button(name)) {
+            strcpy(g_browse_dir, dirs_ordered[i].c_str());
+        }
+        ImGui::SameLine();
+    }
+
+    dirs_ordered.clear();
+
+    if (ImGui::Button("<")) {
+        Path::directory_of(g_browse_dir, g_browse_dir);
+        if (g_browse_mode != File_Browser_Mode::file) strcpy(file_browser_popup.return_value, g_browse_dir);
+    }
+
+    #ifdef _WIN32
+
+    for (char c = 'A'; c <= 'Z'; c++) {
+        if (strlen(g_browse_dir) == 2 && g_browse_dir[0] == c && g_browse_dir[1] == ':') {
+            strcat(g_browse_dir, "/");
+        }
+    }
+
+    #endif
+
+    ImGui::Text(g_browse_dir);
+
+    ImGui::BeginChildFrame(1, { ImGui::GetWindowSize().x, ImGui::GetWindowSize().y * 0.65f }, ImGuiWindowFlags_MenuBar);
+
+    ImGui::BeginMenuBar();
+
+    if (ImGui::BeginMenu("Create directory")) {
+        path_str_t new_dir_name = "";
+        auto flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCharFilter;
+        static auto char_filter = [](ImGuiTextEditCallbackData* data) { 
+
+            if ((data->EventChar >= '0' && data->EventChar <= '9') 
+             || (data->EventChar >= 'A' && data->EventChar <= 'Z')
+             || (data->EventChar >= 'a' && data->EventChar <= 'z')
+             || (data->EventChar == '_')) 
+                 return 0;
+            return 1;
+        };
+        bool enter = ImGui::RInputText("name", new_dir_name, sizeof(new_dir_name), flags, char_filter);
+
+        if (strcmp(new_dir_name, "") != 0 && (enter || ImGui::MenuItem("Ok"))) {
+            path_str_t full_dir = "";
+            sprintf(full_dir, "%s/%s", g_browse_dir, new_dir_name);
+            log_trace(full_dir);
+            Path::create_directory(full_dir);
+            strcpy(new_dir_name, "");
+        }
+        
+        ImGui::EndMenu();
+    }
+
+    ImGui::EndMenuBar();
+
+    Path::iterate_directories(g_browse_dir, [](str_ptr_t path) {
+        if (!Path::can_open(path)){
+            path_str_t dir_name = "";
+            path_str_t ext = "";
+            Path::extension_of(path, ext);
+            if (ext[0] == '\0') Path::name_without_extension(path, dir_name);
+            else			    Path::name_with_extension(path, dir_name);
+
+            ImGui::Icon(ICON_TYPE_FOLDER, { 16, 16 });
+            ImGui::SameLine();
+            if (ImGui::Selectable(dir_name)) {
+                if (g_browse_mode == File_Browser_Mode::file || ImGui::IsMouseDoubleClicked(0)) {
+                    strcpy(g_browse_dir, path);
+                    if (g_browse_mode != File_Browser_Mode::file) strcpy(file_browser_popup.return_value, g_browse_dir);
+                } else if (g_browse_mode != File_Browser_Mode::file)
+                    strcpy(file_browser_popup.return_value, path);
+            }
+        }
+    });
+
+    Path::iterate_directories(g_browse_dir, [](str_ptr_t path) {
+        if (Path::can_open(path) && g_browse_mode != File_Browser_Mode::directory) {
+            path_str_t file_name = "";
+            path_str_t ext = "";
+            Path::extension_of(path, ext);
+            if (ext[0] == '\0') Path::name_without_extension(path, file_name);
+            else			    Path::name_with_extension(path, file_name);
+
+            ImGui::Icon(ICON_TYPE_FILE, { 16, 16 });
+            ImGui::SameLine();
+            if (ImGui::Selectable(file_name, strcmp(path, file_browser_popup.return_value) == 0)) {
+                strcpy(file_browser_popup.return_value, path);
+            }
+        }
+    });
+
+    ImGui::EndChildFrame();
+
+    ImGui::Text("Selected: %s", file_browser_popup.return_value);
+}
+
+bool load_module(Module* mod) {
+    if (!mod->load()) return false;
+    ap_assert(mod->init, "Init function missing in module '{}'", mod->str_id);
+    mod->init();
+
+    invoke_mod_function(mod, on_load, void, g_graphics);
+
+    return true;
+}
+
+bool unload_module(Module* mod) {
+    invoke_mod_function(mod, on_unload, void, g_graphics);
+    if (mod->is_loaded) {
+        for (auto comp_id : mod->get_component_ids()) {
+            g_reg.each([mod, comp_id](entt::entity entity) {
+                if (mod->get_component(comp_id, g_reg, entity)) {
+                    mod->remove_component(comp_id, g_reg, entity);
+                }
+            });
+        }
+    }
+    if (!mod->unload()) return false;
+    return true;
+}
+
+bool reload_module(Module* mod) {
+    return unload_module(mod) && load_module(mod);
+}
+
+void save_project() {
+    for (auto mod : g_modules) invoke_mod_function(mod, save_to_disk, void, g_project_dir);
+    to_file(g_reg, g_ecs_dir);
+    save_user_settings(g_user_dir);
+    ImGui::SaveStyleToDisk(g_style_path);
+}
+
+void load_project(str_ptr_t new_dir) {
+    strcpy(g_project_dir, new_dir);
+    sprintf(g_ecs_dir, "%s/ecs", new_dir);
+    g_reg.clear();
+    deselect_all_entities();
+    for (auto mod : g_modules) if (mod->is_loaded) reload_module(mod); else load_module(mod);
+    from_file(g_reg, g_ecs_dir);
+
+    for (auto mod : g_modules) invoke_mod_function(mod, load_from_disk, void, g_project_dir);
+
+    load_user_settings(g_user_dir);
+    ImGui::LoadStyleFromDisk(g_style_path);
+}
 
 int start(int argc, char** argv) {
     (void)argc;
@@ -376,6 +578,8 @@ int start(int argc, char** argv) {
 
     set_logger_level(spdlog::level::trace);
 
+    
+
     auto exe = get_executable_path();
     char ext[1024] = "";
     char name_with[1024] = "";
@@ -389,35 +593,17 @@ int start(int argc, char** argv) {
 
     sprintf(g_user_dir, "%s/../../.user", get_executable_directory());
 
-    path_str_t project_dir = "";
-    sprintf(project_dir, "%s/../../test_project", get_executable_directory());
-    Path::to_absolute(project_dir, project_dir);
+    sprintf(g_project_dir, "%s/../../test_project", get_executable_directory());
+    Path::to_absolute(g_project_dir, g_project_dir);
 
-    path_str_t ecs_path = "";
-    sprintf(ecs_path, "%s/ecs", project_dir);
+    strcpy(g_browse_dir, g_project_dir);
 
-    path_str_t style_path = "";
-    sprintf(style_path, "%s/style", g_user_dir);
+    sprintf(g_ecs_dir, "%s/ecs", g_project_dir);
+
+    sprintf(g_style_path, "%s/style", g_user_dir);
 
     path_str_t essential_dir = "";
     sprintf(essential_dir, "%s/../../essential", get_executable_directory());
-
-    
-
-    log_trace("ecs_path: {}", ecs_path);
-
-    //Binary_Archive archive("test_archive");
-    //int a = 1, b = 2, c = INT_MAX;
-    /*str_t<128> str = "U mom";
-    archive.write("a", &a, sizeof(int));
-    archive.write("b", &b, sizeof(int));
-    archive.write("c", &c, sizeof(int));
-    archive.write("str", str, strlen(str) + 1);*/
-
-    /*log_trace("a:   {}\n b:   {}\n c:   {}\nstr: {}", 
-               archive.read<int>("a"), archive.read<int>("b"),
-               archive.read<int>("c"), archive.read<str_t<6>>("str"));*/
-
 
     register_gui_window(&scene_inspector);
     register_gui_window(&entity_inspector);
@@ -470,8 +656,31 @@ int start(int argc, char** argv) {
         
     };  
 
+    strcpy(file_browser_popup.str_id, "File Browser");
+    file_browser_popup.is_modal = true;
+    file_browser_popup.fn = []() {
+
+        do_file_browser_gui();
+
+        if (ImGui::Button("Ok")) {
+            if (file_browser_popup.done_fn) {
+                file_browser_popup.done_fn();
+                file_browser_popup.done_fn = NULL;
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+            file_browser_popup.done_fn = NULL;
+        }
+    };
+
     register_gui_popup(&add_component_popup);
     register_gui_popup(&manage_component_popup);
+    register_gui_popup(&file_browser_popup);
+
+
         
     g_graphics_thread = g_thread_server.make_thread();
 
@@ -481,29 +690,12 @@ int start(int argc, char** argv) {
 
     g_thread_server.wait_for_thread(g_graphics_thread);
 
-    ImGui::LoadStyleFromDisk(style_path);
-
     register_module("test_module");
     register_module("ecs_2d_renderer");
     register_module("asset_manager");
     register_module("2d_physics");
     register_module("2d_particles_simulator");
 
-    for (auto* mod : g_modules) {
-        log_trace("Loading module '{}'", mod->str_id);
-        if (mod->load()) {
-            log_info("Successfully loaded module '{}'", mod->str_id);
-        } else {
-            log_error("Failed loading module '{}'", mod->str_id);
-        }
-
-        invoke_mod_function(mod, on_load, void, g_graphics);
-        invoke_mod_function(mod, init, void);
-    }
-
-    if (Path::exists(ecs_path)) {
-        from_file(g_reg, ecs_path);
-    }
 
     path_str_t font_path = "";
     sprintf(font_path, "%s/input_mono.ttf", essential_dir);
@@ -522,24 +714,6 @@ int start(int argc, char** argv) {
     ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
     ImGui::GetIO().FontDefault = ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
     ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
-
-    /*sprintf(font_path, "%s/comfortaa_regular.ttf", essential_dir);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
-
-    sprintf(font_path, "%s/jack_input.ttf", essential_dir);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
-
-    sprintf(font_path, "%s/keep_calm.ttf", essential_dir);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);*/
     
     ImGui::GetIO().Fonts->Build();
 
@@ -554,10 +728,7 @@ int start(int argc, char** argv) {
     sprintf(ini_path, "%s/imgui.ini", g_user_dir);
     ImGui::GetIO().IniFilename = ini_path;
 
-    for (auto* mod : g_modules) invoke_mod_function(mod, load_from_disk, void, project_dir);
-    load_user_settings(g_user_dir);
-
-    
+    load_project(g_project_dir);
 
     while (g_running) {
         
@@ -650,6 +821,36 @@ int start(int argc, char** argv) {
         ImGui::PopStyleVar();
         bar_width = ImGui::GetWindowWidth();
 
+        if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsKeyDown(AP_KEY_S)) {
+            save_project();
+        }
+        if (ImGui::BeginMenu("File")) {
+            
+            if (ImGui::MenuItem("New project...")) {
+                open_file_browser(File_Browser_Mode::directory, [](str_ptr_t result) {
+                    ap_assert(Path::exists(result) && Path::is_directory(result), "Invalid project directory");
+                    load_project(result);
+
+                    save_project();
+                });
+            }
+
+            if (ImGui::MenuItem("Save project", "ctrl+s")) {
+                save_project();
+            }
+
+            if (ImGui::MenuItem("Load project...")) {
+                open_file_browser(File_Browser_Mode::directory, [](str_ptr_t result) {
+                    ap_assert(Path::exists(result) && Path::is_directory(result), "Invalid project directory");
+                    load_project(result);
+                });
+            }
+
+            ImGui::Separator();
+
+            ImGui::EndMenu();
+        }
+
         if (ImGui::BeginMenu("Windows")) {
             for (auto* gui_wnd : gui_windows) {
                 ImGui::MenuItem(gui_wnd->name, NULL, &gui_wnd->open);
@@ -667,18 +868,30 @@ int start(int argc, char** argv) {
         bar_height = ImGui::GetItemRectSize().y * 0.4f;
         if (toggle_play) {
             if (!g_is_playing) {
-                to_file(g_reg, ecs_path);
-                for (auto mod : g_modules) invoke_mod_function(mod, save_to_disk, void, project_dir);
-                ImGui::SaveStyleToDisk(style_path);
+                to_file(g_reg, g_ecs_dir);
+                
                 g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_begin = true;
             } else {
-                g_reg.clear();
+                
+                static Dynamic_Array<str_ptr_t> selected_names;
+                for (auto& selected_entity : get_selected_entities()) {
+                    selected_names.push_back(g_reg.get<Entity_Info>(selected_entity).name);
+                }
                 deselect_all_entities();
-                from_file(g_reg, ecs_path);
-                for (auto mod : g_modules) invoke_mod_function(mod, load_from_disk, void, project_dir);
-                load_user_settings(g_user_dir);
-                ImGui::LoadStyleFromDisk(style_path);
+
+                g_reg.clear();
+                from_file(g_reg, g_ecs_dir);
+
+                for (auto n : selected_names) {
+                    g_reg.view<Entity_Info>().each([n](entt::entity entity, Entity_Info& info) {
+                        if (strcmp(info.name, n) == 0) {
+                            select_entity(entity);
+                        }
+                    });
+                }
+                selected_names.clear();
+
                 g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_stop = true;
             }
@@ -823,38 +1036,17 @@ int start(int argc, char** argv) {
         update_dependencies();
 
         for (auto* mod : to_reload) {
-            if (mod->on_unload) mod->on_unload(g_graphics);
-            if (mod->reload()) {
-                if (mod->on_load) mod->on_load(g_graphics);
-                ap_assert(mod->init, "init was not found in module");
-                mod->init();
-            }
+            reload_module(mod);
         }
         to_reload.clear();
 
         for (auto* mod : to_load) {
-            if (mod->load()) {
-                if (mod->on_load) mod->on_load(g_graphics);
-                ap_assert(mod->init, "init was not found in module");
-                mod->init();
-            }
+            load_module(mod);
         }
         to_load.clear();
 
         for (auto* mod : to_unload) {
-            if (mod->is_loaded) {
-                for (auto comp_id : mod->get_component_ids()) {
-                    g_reg.each([mod, comp_id](entt::entity entity) {
-                        if (mod->get_component(comp_id, g_reg, entity)) {
-                            mod->remove_component(comp_id, g_reg, entity);
-                        }
-                    });
-                }
-            }
-            if (mod->on_unload) mod->on_unload(g_graphics);
-            if (mod->unload()) {
-                
-            }
+            unload_module(mod);
         }
         to_unload.clear();
     }

@@ -126,13 +126,24 @@ struct Buffer_Layout_Specification {
             stride += entry.size;
         }
     }
+    inline Buffer_Layout_Specification(const Buffer_Layout_Specification& rhs) {
+        stride = rhs.stride;
+        entries = rhs.entries;
+    }
+
+    Buffer_Layout_Specification& operator= (const Buffer_Layout_Specification& rhs) {
+        stride = rhs.stride;
+        entries = rhs.entries;
+        return *this;
+    }
+
     size_t stride = 0;
     Dynamic_Array<Buffer_Layout_Entry> entries;
 
     inline bool is_sated_by(const Buffer_Layout_Specification& other) const {
         if (other.entries.size() < entries.size()) return false;
         for (size_t i = 0; i < entries.size(); i++) {
-            if (entries[i].size != other.entries[i].size) return false;
+            if (entries.at(i).size != other.entries.at(i).size) return false;
         }
         return true;
     }

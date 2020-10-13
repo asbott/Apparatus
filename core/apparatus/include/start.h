@@ -61,12 +61,14 @@ struct Game_Input {
 };
 
 struct Gui_Window {
-	Gui_Window(bool open, str_ptr_t _name) : open(open) {
+	Gui_Window(bool open, str_ptr_t _name, str_ptr_t _tree_path = "Windows") : open(open) {
 		strcpy(name, _name);
+		strcpy(tree_path, _tree_path);
 	}
 	bool open;
 	bool focused = false;
 	name_str_t name;
+	path_str_t tree_path = "Windows";
 };
 
 struct Gui_Popup {
@@ -106,6 +108,10 @@ namespace ImGui {
 	AP_API bool IconButton(Icon_Type icon, mz::ivec2 size, const mz::color& bgr_color = 0);
 }
 
+enum class File_Browser_Mode {
+	directory, file, all
+};
+
 struct Graphics_Context;
 
 void AP_API quit();
@@ -135,6 +141,8 @@ AP_API bool is_any_entity_selected();
 AP_API const Hash_Set<entt::entity>& get_selected_entities();
 
 AP_API str_ptr_t get_user_directory();
+
+AP_API void open_file_browser(File_Browser_Mode mode, std::function<void(str_ptr_t)> result_callback = 0);
 
 AP_API bool is_playing();
 

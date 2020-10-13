@@ -40,7 +40,6 @@ struct Asset_Directory {
 Gui_Window g_asset_manager = { true, "Asset Manager" };
 Gui_Window g_asset_inspector = { false, "Asset Inspector" };
 
-Gui_Popup g_file_browser_popup;
 Gui_Popup g_manager_menu_popup;
 
 path_str_t g_current_dir;
@@ -292,9 +291,8 @@ void do_asset_manager_menu_gui(Asset_Directory* dir) {
     }
 
     if (ImGui::MenuItem("Add")) {
-        g_file_browser_popup.should_open = true;
-        g_file_browser_popup.done_fn = [dir]() {
-            str_ptr_t result_path = g_file_browser_popup.return_value;
+        open_file_browser(File_Browser_Mode::file, [dir](str_ptr_t result) {
+            str_ptr_t result_path = result;
             if (Path::exists(result_path)) {
                 path_str_t new_path = "";
                 path_str_t file_name = "";
@@ -307,7 +305,7 @@ void do_asset_manager_menu_gui(Asset_Directory* dir) {
                     dir->assets.emplace(id);
                 }
             }
-        };
+        });
     }
 }
 
@@ -336,129 +334,6 @@ extern "C" {
         register_gui_window(&g_asset_inspector);
 
         strcpy(g_current_dir, get_executable_directory());
-
-        strcpy(g_file_browser_popup.str_id, "File Browser");
-        g_file_browser_popup.is_modal = true;
-        strcpy(g_file_browser_popup.return_value, get_executable_directory());
-        g_file_browser_popup.fn = [graphics]() {
-
-            #ifdef _OS_WINDOWS
-            str_t<3> current_disk = "  ";
-            current_disk[0] = g_current_dir[0];
-            current_disk[1] = g_current_dir[1];
-            if (ImGui::RBeginCombo("Disk", current_disk)) {
-
-                for (char c = 'A'; c <= 'Z'; c++) {
-                    str_t<3> disk = "  ";
-                    disk[0] = c;
-                    disk[1] = ':';
-                    str_t<4> disk_path;
-                    sprintf(disk_path, "%s/", disk);
-                    if (!Path::exists(disk_path)) continue;
-                    bool is_current = strcmp(disk, current_disk) == 0;
-                    if (ImGui::MenuItem(disk, NULL, is_current)) {
-                        if (!is_current) {
-                            sprintf(g_current_dir, "%s/", disk);
-                        }
-                    }
-                }
-
-                ImGui::REndCombo();
-            }
-            #endif
-
-            ImGui::Text("Current Directory: %s", g_current_dir);
-
-            path_str_t prev_dir = "";
-            Path::directory_of(g_current_dir, prev_dir);
-            
-            static Dynamic_Array<Dynamic_String> dirs_ordered;
-            while (Path::exists(prev_dir)) {
-                dirs_ordered.push_back(prev_dir);
-                str16_t root = "";
-                Path::root_name(g_current_dir, root);
-                if (strcmp(root, prev_dir) == 0) break;
-                Path::directory_of(prev_dir, prev_dir);
-            }
-
-            for (int i = (int)dirs_ordered.size() - 1; i >= 0; i--) {
-                path_str_t name;
-                Path::name_with_extension(dirs_ordered[i].c_str(), name);
-                if (ImGui::Button(name)) {
-                    strcpy(g_current_dir, dirs_ordered[i].c_str());
-                }
-                ImGui::SameLine();
-            }
-
-            dirs_ordered.clear();
-
-            if (ImGui::Button("<")) {
-                Path::directory_of(g_current_dir, g_current_dir);
-            }
-
-            #ifdef _WIN32
-
-            for (char c = 'A'; c <= 'Z'; c++) {
-                if (strlen(g_current_dir) == 2 && g_current_dir[0] == c && g_current_dir[1] == ':') {
-                    strcat(g_current_dir, "/");
-                }
-            }
-
-            #endif
-
-            ImGui::BeginChildFrame(1, { ImGui::GetWindowSize().x, ImGui::GetWindowSize().y * 0.65f });
-
-            Path::iterate_directories(g_current_dir, [graphics](str_ptr_t path) {
-                if (!Path::can_open(path)){
-                    path_str_t dir_name = "";
-                    path_str_t ext = "";
-                    Path::extension_of(path, ext);
-                    if (ext[0] == '\0') Path::name_without_extension(path, dir_name);
-                    else			    Path::name_with_extension(path, dir_name);
-
-                    ImGui::Icon(ICON_TYPE_FOLDER, { 16, 16 });
-                    ImGui::SameLine();
-                    if (ImGui::Selectable(dir_name)) {
-                        strcpy(g_current_dir, path);
-                    }
-                }
-            });
-
-            Path::iterate_directories(g_current_dir, [graphics](str_ptr_t path) {
-                if (Path::can_open(path)) {
-                    path_str_t file_name = "";
-                    path_str_t ext = "";
-                    Path::extension_of(path, ext);
-                    if (ext[0] == '\0') Path::name_without_extension(path, file_name);
-                    else			    Path::name_with_extension(path, file_name);
-
-                    ImGui::Icon(ICON_TYPE_FILE, { 16, 16 });
-                    ImGui::SameLine();
-                    if (ImGui::Selectable(file_name, strcmp(path, g_file_browser_popup.return_value) == 0)) {
-                        strcpy(g_file_browser_popup.return_value, path);
-                    }
-                }
-            });
-
-            ImGui::EndChildFrame();
-
-            ImGui::Text("Selected file: %s", g_file_browser_popup.return_value);
-
-            if (ImGui::Button("Ok")) {
-                if (g_file_browser_popup.done_fn) {
-                    g_file_browser_popup.done_fn();
-                    g_file_browser_popup.done_fn = NULL;
-                }
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel")) {
-                ImGui::CloseCurrentPopup();
-                g_file_browser_popup.done_fn = NULL;
-            }
-        };
-
-        register_gui_popup(&g_file_browser_popup);
 
         g_manager_menu_popup.is_modal = false;
         strcpy(g_manager_menu_popup.str_id, "Asset Manager Menu");
@@ -574,7 +449,6 @@ extern "C" {
         unregister_gui_window(&g_asset_manager);
             unregister_gui_window(&g_asset_inspector);
 
-        unregister_gui_popup(&g_file_browser_popup);
         unregister_gui_popup(&g_manager_menu_popup);
     }
 

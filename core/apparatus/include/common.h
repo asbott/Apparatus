@@ -104,3 +104,9 @@
 #endif
 
 #define stringify(x) #x
+
+#ifdef _CONFIG_DEBUG
+	#define debug_only(x) x
+#else
+	#define debug_only(x) x
+#endif

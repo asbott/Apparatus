@@ -203,7 +203,7 @@ struct Gizmo_List {
 	bool enable = true;
 };
 
-constexpr mz::fvec2 game_size = mz::fvec2(1600, 900);
+mz::fvec2 game_size = mz::fvec2(1600, 900);
 fmat4 g_game_ortho;
 
 Gui_Window g_viewport    = { true, "2D Viewport" };
@@ -213,9 +213,52 @@ entt::entity selected_camera = entt::null;
 
 Gizmo_List gizmo_list;
 
-Hash_Set<graphics_id_t> render_targets_to_destroy;
+Ordered_Set<graphics_id_t> render_targets_to_destroy;
 
 Editor_View g_editor_cam;
+
+Hash_Set<ivec2> resolutions_16_9 = {
+	{ 128, 72 },
+	{ 384, 216 },
+	{ 512, 288 },
+	{ 640, 360 },
+	{ 768, 432 },
+	{ 1024, 576 },
+	{ 1280, 720 },
+	{ 1536, 864 },
+	{ 1920, 1080 },
+	{ 2560, 1440 },
+	{ 3072, 1728 },
+	{ 3840, 2160 },
+	{ 5120, 2880 },
+	{ 6400, 3600 },
+	{ 7680, 4320 },
+};
+
+Hash_Set<ivec2> resolutions_16_10 = {
+	{ 1280, 800 },
+	{ 1440, 900 },
+	{ 1680, 1050 },
+	{ 1920, 1200 },
+	{ 2560, 1600 },
+	{ 3840, 2400 },
+};
+
+Hash_Set<ivec2> resolutions_4_3 = {
+	{ 160, 120 },
+	{ 320, 240 },
+	{ 640, 480 },
+	{ 960, 720 },
+	{ 1024, 768 },
+	{ 1280, 960 },
+	{ 1600, 1200 },
+	{ 1920, 1440 },
+	{ 2560, 1920 },
+	{ 3200, 2400 },
+	{ 4096, 3072 },
+	{ 6400, 4800 },
+
+};
 
 void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& ortho, const color16& clear_color, graphics_id_t render_target, Render_Context<Vertex, BUDGET>& context, fvec2 view_size) {
 	(void)ortho; (void)view_size;
@@ -450,6 +493,10 @@ fquad get_selection_quad(entt::registry& reg, entt::entity entity, Transform2D& 
 	return selection_quad;
 }
 
+bool is_valid_camera(entt::registry& reg, entt::entity entity) {
+	return reg.valid(entity) && reg.has<View2D, Transform2D, Entity_Info>(entity);
+}
+
 extern "C" {
 	_export void __cdecl on_load(Graphics_Context* graphics) {
 		g_graphics = graphics;
@@ -539,7 +586,7 @@ extern "C" {
 
 	_export void __cdecl on_play_begin() {
 		auto& reg = get_entity_registry();
-		if (!reg.valid(selected_camera))  {
+		if (!is_valid_camera(reg, selected_camera))  {
 			const auto& view = reg.view<View2D, Transform2D>();
 			if (view.size() > 0) {
 				selected_camera = view.front();
@@ -550,7 +597,7 @@ extern "C" {
 
 		ImGui::SetWindowFocus("2D Viewport");
 
-		if (reg.valid(selected_camera)) {
+		if (is_valid_camera(reg, selected_camera)) {
 			path_str_t ecs2d_file = "";
 			sprintf(ecs2d_file, "%s/%s", get_user_directory(), "ecs2d");
 
@@ -632,8 +679,14 @@ extern "C" {
 			}
 		});
 
-		reg.view<View2D, Transform2D>().each([](View2D& view, Transform2D transform) {
-			fmat4 matrix = transform.to_mat4();
+		
+
+		reg.view<View2D, Transform2D>().each([graphics, &reg](entt::entity entity, View2D& view, Transform2D& view_transform) {
+			if (!is_valid_camera(reg, selected_camera)) {
+				selected_camera = entity;
+			}
+			
+			fmat4 matrix = view_transform.to_mat4();
 			fvec2 hs = game_size / 2.f;
 			gizmo_list.add_wire_quad(fquad(
 				(matrix * fvec4(-hs.x,  hs.y, 1, 1)).v2,
@@ -643,16 +696,8 @@ extern "C" {
 			));
 
 			view.ortho = g_game_ortho;
-		});
 
-		for (auto ent : get_selected_entities()) {
-			if (reg.has<Transform2D>(ent)) {
-				gizmo_list.add_wire_quad(get_selection_quad(reg, ent, reg.get<Transform2D>(ent)), COLOR_RED);
-			}
-		}
 
-		reg.view<View2D, Transform2D>().each([graphics, &reg](View2D& view, Transform2D& view_transform) {
-			(void)view_transform;
 			if (view.render_target == G_NULL_ID) {
 				view.render_target = graphics->make_render_target({ 1, 1 });
 				render_targets_to_destroy.emplace(view.render_target);
@@ -665,6 +710,12 @@ extern "C" {
 			graphics->clear(G_COLOR_BUFFER_BIT, view.render_target);
 			render_sprites(graphics, view_transform.to_mat4(), g_game_ortho, view.clear_color, view.render_target, quad_render_context, game_size);
 		});
+
+		for (auto ent : get_selected_entities()) {
+			if (reg.has<Transform2D>(ent)) {
+				gizmo_list.add_wire_quad(get_selection_quad(reg, ent, reg.get<Transform2D>(ent)), COLOR_RED);
+			}
+		}
 
 		graphics->set_clear_color(g_editor_cam.clear_color);
 		auto render_target_size = graphics->get_render_target_size(g_editor_cam.render_target);
@@ -774,6 +825,7 @@ extern "C" {
 		flags |= ImGuiWindowFlags_MenuBar;
 		flags |= ImGuiWindowFlags_NoScrollbar;
 		flags |= ImGuiWindowFlags_NoScrollWithMouse;
+		
 		ImGui::DoGuiWindow(&g_viewport, [graphics]() {
 			auto& reg = get_entity_registry();
 			ImGui::BeginMenuBar();
@@ -781,32 +833,57 @@ extern "C" {
 			static mz::ivec2 resolution = { 1280, 720 };
 			if (ImGui::BeginMenu("Settings")) {
 				ImGui::RDragInt2("Resolution", resolution.ptr, 1.f, 1, 20000);
-
 				
-				if (ImGui::RBeginCombo("Camera", !reg.valid(selected_camera) ? "None" : reg.get<Entity_Info>(selected_camera).name)) {
-					
-					if (ImGui::Selectable("None", !reg.valid(selected_camera))) {
-						selected_camera = entt::null;
-					}
-
-					reg.view<View2D, Transform2D, Entity_Info>().each([](entt::entity entity, View2D& view, Transform2D& transform, Entity_Info& info) {
-						(void)transform;(void)view;
-						if (ImGui::Selectable(info.name, selected_camera == entity)) {
-							selected_camera = entity;
+				str_t<20> current_res_str = "";
+				sprintf(current_res_str, "%ix%i", resolution.x, resolution.y);
+				if (ImGui::RBeginCombo("Presets", current_res_str)) {
+					ImGui::Text("16:9");
+					for (auto res : resolutions_16_9) {
+						str_t<20> res_str = "";
+						sprintf(res_str, "%ix%i", res.x, res.y);
+						if (ImGui::Selectable(res_str, res == resolution)) {
+							resolution = res;
 						}
-					});
-
+					}
+					ImGui::Text("16:10");
+					for (auto res : resolutions_16_10) {
+						str_t<20> res_str = "";
+						sprintf(res_str, "%ix%i", res.x, res.y);
+						if (ImGui::Selectable(res_str, res == resolution)) {
+							resolution = res;
+						}
+					}
+					ImGui::Text("4:3");
+					for (auto res : resolutions_4_3) {
+						str_t<20> res_str = "";
+						sprintf(res_str, "%ix%i", res.x, res.y);
+						if (ImGui::Selectable(res_str, res == resolution)) {
+							resolution = res;
+						}
+					}
 					ImGui::REndCombo();
 				}
 				ImGui::EndMenu();
 			}
+			ImGui::Separator();
+			str_ptr_t lbl = is_valid_camera(reg, selected_camera)
+			              ? reg.get<Entity_Info>(selected_camera).name
+						  : "No camera in scene";
+			if (ImGui::BeginMenu(lbl, is_valid_camera(reg, selected_camera))) {
+				reg.view<View2D, Transform2D, Entity_Info>().each([&](entt::entity entity, View2D&, Transform2D&, Entity_Info& info){
+					if (ImGui::Selectable(info.name, selected_camera == entity)) {
+						selected_camera = entity;
+					}
+				});
+				ImGui::EndMenu();
+			}
 
 			ImGui::EndMenuBar();
-
-			if (reg.valid(selected_camera)) {
+			frect view_rect = calculate_view_rect(resolution);
+			if (is_valid_camera(reg, selected_camera) && view_rect.width > 0 && view_rect.height > 0) {
 				graphics_id_t fbo = reg.get<View2D>(selected_camera).render_target;
 
-				frect view_rect = calculate_view_rect(resolution);
+				
 
 				auto current_resolution = graphics->get_render_target_size(fbo);
 
@@ -825,6 +902,14 @@ extern "C" {
 					ImVec2(1, 0)
 				);
 
+				if (current_resolution != resolution) {
+					f32 aspect_ratio = (f32)resolution.width / (f32)resolution.height;
+					f32 szx = aspect_ratio * game_size.height;
+					f32 szy = game_size.height;
+					game_size = {szx, szy};
+					g_game_ortho = mz::projection::ortho<float>(-szx / 2.f, szx / 2.f, -szy / 2.f, szy / 2.f, -1, 1);
+				}
+
 				is_game_hovered = ImGui::IsItemHovered();
 				bool is_game_focused = ImGui::IsWindowFocused();
 
@@ -838,7 +923,7 @@ extern "C" {
 				fvec2 mouse_ratio = { mouse_pos.x / view_rect.size.x, mouse_pos.y / view_rect.size.y };
 				mouse_pos.x = mouse_ratio.x * game_size.x;
 				mouse_pos.y = mouse_ratio.y * game_size.y;
-
+				
 
 				fmat4 cam_transform = reg.get<Transform2D>(selected_camera).to_mat4();
 				cam_transform.rows[2].w = -.5f;
@@ -860,7 +945,7 @@ extern "C" {
 					game_input()->state.mouse_down[i] = is_game_focused && ImGui::IsMouseDown(i);
 				}
 			} else {
-				ImGui::Text("No valid entity with View2D and Transform2D selected");
+				ImGui::Text("Add an entity with a View2D and Transform2D for a valid viewport");
 			}
 
 		}, flags);
@@ -887,8 +972,8 @@ extern "C" {
 
 			auto& reg = get_entity_registry();
 			
-			if (resolution.x > 0 && resolution.y > 0) {
-				frect view_rect = calculate_view_rect(resolution);
+			frect view_rect = calculate_view_rect(resolution);
+			if (view_rect .width > 0 && view_rect .height > 0) {
 			
 				graphics_id_t texture = graphics->get_render_target_texture(g_editor_cam.render_target);
 				
