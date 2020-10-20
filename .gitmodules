@@ -16,3 +16,6 @@
 [submodule "deps/imgui"]
 	path = deps/imgui
 	url = https://github.com/ocornut/imgui
+[submodule "deps/box2d"]
+	path = deps/box2d
+	url = https://github.com/asbott/box2d
