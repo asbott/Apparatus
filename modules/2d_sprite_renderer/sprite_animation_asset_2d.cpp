@@ -46,9 +46,9 @@ void on_gui(void* parameter) {
             auto& tex_data = *(Texture_Data*)asset->get_runtime_data();
 
             f32 width = ImGui::GetWindowContentRegionWidth();
-            f32 height = 
+            /*f32 height = 
 
-            data.ortho = mz::projection::ortho<f32>(-width / 2.f, width / 2.f, );
+            data.ortho = mz::projection::ortho<f32>(-width / 2.f, width / 2.f, );*/
 
             asset_functions->end_use(params.texture);
         }
