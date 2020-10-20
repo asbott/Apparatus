@@ -350,5 +350,7 @@ workspace "apparatus"
             "deps/box2d/include",
         }
 
+        defines { "B2_API" }
+
     
 
