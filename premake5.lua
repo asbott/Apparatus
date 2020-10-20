@@ -56,13 +56,13 @@ workspace "apparatus"
         floatingpoint "Fast"
 
     filter "configurations:*DirectX11"
-        defines { "AP_SUPPORT_DX11" }
+        --defines { "AP_SUPPORT_DX11" }
 
     filter "configurations:*OpenGL45"
         defines { "AP_SUPPORT_OPENGL45" }
 
     filter { "system:windows", "configurations:Debug or Release or Test" }
-        defines { "AP_SUPPORT_OPENGL45", "AP_SUPPORT_DX11" }
+        defines { "AP_SUPPORT_OPENGL45"--[[, "AP_SUPPORT_DX11"]] }
     filter { "system:linux", "configurations:Debug or Release or Test" }
         defines { "AP_SUPPORT_OPENGL45" }
 
@@ -317,9 +317,9 @@ workspace "apparatus"
             "deps/imgui/imstb_textedit.h",
             "deps/imgui/imstb_truetype.h",
             "deps/imgui/imgui_demo.cpp",
-            "deps/imgui/examples/imgui_impl_opengl3.cpp",
-            "deps/imgui/examples/imgui_impl_glfw.cpp",
-            "deps/imgui/examples/imgui_impl_dx11.cpp",
+            "deps/imgui/backends/imgui_impl_opengl3.cpp",
+            "deps/imgui/backends/imgui_impl_glfw.cpp",
+            "deps/imgui/backends/imgui_impl_dx11.cpp",
             "deps/imgui/misc/cpp/imgui_stdlib.cpp"
         }
         

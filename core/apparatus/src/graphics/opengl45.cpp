@@ -7,8 +7,8 @@
 
 #include <glfw/glfw3.h>
 
-#include <examples/imgui_impl_opengl3.h>
-#include <examples/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_glfw.h>
 
 #include "graphics/opengl45.h"
 
