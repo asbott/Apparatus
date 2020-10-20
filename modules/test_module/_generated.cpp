@@ -5,6 +5,7 @@
 #include <functional>
 
 #include <misc/cpp/imgui_stdlib.h>
+#include <asset_manager/asset_manager.h>
 
 Hash_Set<uintptr_t> runtime_ids;
 Hash_Map<std::string, uintptr_t> name_id_map;
@@ -62,6 +63,7 @@ extern "C" {
                 "BallMovement",
                 id,
                 false,
+                sizeof(BallMovement),
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data) {
@@ -78,6 +80,38 @@ extern "C" {
                         "jump_force",
                         sizeof(f32),
                         sizeof(f32),
+                    },
+                }
+            };
+        }
+        {
+            uintptr_t id = (uintptr_t)typeid(WASDMovement).name();
+            runtime_ids.emplace(id);
+            name_id_map["WASDMovement"] = id;
+            component_info[id] = {
+                [](entt::registry& reg, entt::entity entity) { 
+                    return &reg.emplace<WASDMovement>(entity);
+                },
+                [](entt::registry& reg, entt::entity entity) { 
+                    if (!reg.has<WASDMovement>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<WASDMovement>(entity);
+                }, 
+                [](entt::registry& reg, entt::entity entity) { 
+                    reg.remove<WASDMovement>(entity);
+                },
+            
+                "WASDMovement",
+                id,
+                false,
+                sizeof(WASDMovement),
+                std::vector<Property_Info> {
+                    Property_Info { 
+                        [](void* data) {
+                            do_gui<float>("move_speed", (float*)data);
+                        },
+                        "move_speed",
+                        sizeof(float),
+                        0,
                     },
                 }
             };

@@ -10,6 +10,7 @@ namespace Path {
 
     AP_API bool write_bytes(str_ptr_t path, byte* data, size_t data_size);
 
+    AP_API bool create_file(str_ptr_t path);
     AP_API bool create_directory(str_ptr_t path);
 
     AP_API bool equals(str_ptr_t path1, str_ptr_t path2);

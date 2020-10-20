@@ -30,10 +30,12 @@ template <typename T>
 using Queue = std::queue<T>;
 
 template <typename T>
-using Stack = std::stack<T>;
+using Deque = std::deque<T>;
 
 template <typename T>
-using Deque = std::deque<T>;
+using Stack = std::stack<T>;
+
+
 
 template<typename T>
 struct Thread_Safe_Queue {
@@ -352,9 +354,11 @@ struct Dynamic_Array {
         type_t* new_virtual_end = new_buffer + size();
 
         if (_buffer_head) {
+            //memcpy(new_buffer, _buffer_head, size() * sizeof(type_t));
+
             for (size_t i = 0; i < size(); i++) {
                 _allocator.construct(new_buffer + i, std::move(_buffer_head[i]));
-
+            
                 _allocator.destruct(_buffer_head + i);            
             }
 
@@ -430,6 +434,38 @@ struct Dynamic_Array {
 
         _buffer_virtual_end--;
         debug_only(__size--);
+    }
+
+    inline void erase(iterator_t erase_begin, iterator_t erase_end) {
+        assert(erase_begin >= begin() && erase_begin <  end() && "Invalid iterator");
+        assert(erase_end   >= begin() && erase_end   <= end() && "Invalid iterator");
+        if (erase_begin == erase_end) {
+            erase(erase_begin);
+            return;
+        }
+        
+        if (erase_end < erase_begin) {
+            iterator_t temp = erase_begin;
+            erase_begin = erase_end;
+            erase_end = temp;
+        }
+        
+        for (iterator_t it = erase_begin; it < erase_end; ++it) {
+            _allocator.destruct(it._ptr);
+        }
+        
+        if (erase_end == end()) {
+            _buffer_virtual_end = erase_begin._ptr;
+            debug_only(__size = _buffer_virtual_end - _buffer_head);
+            return;
+
+            
+        }
+
+        memmove(erase_begin._ptr, erase_end._ptr, _buffer_virtual_end - erase_end._ptr);
+
+        _buffer_virtual_end -= (erase_end - erase_begin)._ptr;
+        debug_only(__size = _buffer_virtual_end - _buffer_head);
     }
 
     inline void clear() {

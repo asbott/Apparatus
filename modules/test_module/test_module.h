@@ -9,3 +9,9 @@ struct BallMovement {
 	tag(property)
 	f32 jump_force = 10000;
 };
+
+tag(component)
+struct WASDMovement {
+	tag(property)
+	float move_speed = 1000.f;
+};

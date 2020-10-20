@@ -290,6 +290,7 @@ void OpenGL45::init(bool show_window) {
     glfwWindowHint(GLFW_SAMPLES, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint(GLFW_DEPTH_BITS, GLFW_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef _AP_ENABLE_GL_DEBUG_CONTEXT
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
@@ -539,13 +540,27 @@ void OpenGL45::set_blending(bool value) {
     }
 }
 
+void OpenGL45::set_depth_testing(bool value) {
+    make_context_current();
+    if (value) {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);  
+
+        send_message(G_DEBUG_MESSAGE_SEVERITY_NOTIFY, "Enabled depth testing");
+    } else {
+        glDisable(GL_DEPTH_TEST);
+
+        send_message(G_DEBUG_MESSAGE_SEVERITY_NOTIFY, "Disabled depth testing");
+    }
+}
+
 graphics_id_t OpenGL45::make_vertex_array(const Buffer_Layout_Specification& layout) {
     make_context_current();
     GLuint va;
     glGenVertexArrays(1, &va);
 
     if (va >= _buffer_layouts.size()) {
-        _buffer_layouts.resize((size_t)(va + 1));
+        _buffer_layouts.resize(((size_t)va + 1));
     }
 
     _buffer_layouts[va] = layout;
@@ -685,10 +700,11 @@ graphics_id_t OpenGL45::make_render_target(mz::ivec2 size) {
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
+    _render_targets.resize(std::max<graphics_id_t>(fbo + 1, (graphics_id_t)_render_targets.size()));
+
     graphics_id_t texture = G_NULL_ID;
     glGenTextures(1, &texture);
 
-    _render_targets.resize(std::max<graphics_id_t>(fbo + 1, (graphics_id_t)_render_targets.size()));
 
     _render_targets[fbo].fbo = fbo;
     _render_targets[fbo].size = size;
@@ -968,7 +984,7 @@ void OpenGL45::set_uniform_buffer_data(graphics_id_t ubo, const char* name, void
 
     auto& layout = _uniform_buffer_layouts[ubo];
 
-    for (auto entry : layout.entries) {
+    for (auto& entry : layout.entries) {
         if (strcmp(entry.name, name) == 0) {
             glBindBuffer(GL_UNIFORM_BUFFER, ubo);
             glBufferSubData(GL_UNIFORM_BUFFER, (GLintptr)entry.offset, (GLsizeiptr)entry.size, data);

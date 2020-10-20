@@ -1,6 +1,9 @@
 #include "2d_particles_simulator.h"
 
-#include "ecs_2d_renderer/ecs_2d_renderer.h"
+#include "2d_sprite_renderer/2d_sprite_renderer.h"
+
+#include "2d_viewport/2d_viewport.h"
+#include "2d_editor/2d_editor.h"
 
 #include <random>
 
@@ -107,7 +110,7 @@ Render_Context<Basic_Vertex, sizeof(Basic_Vertex) * 100000 * 3>   tri_render_con
 Render_Context<Basic_Vertex, sizeof(Basic_Vertex) * 100000 * 4>   quad_render_context;
 Render_Context<Sprite_Vertex, sizeof(Sprite_Vertex) * 100000 * 4> sprite_render_context;
 
-Module* renderer_module = NULL;
+Module* g_editor_module = NULL;
 
 std::mt19937_64 rng;
 
@@ -183,7 +186,10 @@ void render_points(Graphics_Context* graphics, Points_Context& context, u64 npar
 }
 
 extern "C" {
-	_export void __cdecl on_load(Graphics_Context* graphics) {
+	_export void __cdecl on_load() {
+        g_editor_module = get_module("2d_editor");
+
+        Graphics_Context* graphics = get_graphics();
         Buffer_Layout_Specification primitive_shader_layout = {
             { "pos",   G_DATA_TYPE_FVEC2 },
             { "color", G_DATA_TYPE_FVEC4 }
@@ -231,8 +237,8 @@ extern "C" {
 
 	}
 
-    _export void __cdecl on_unload(Graphics_Context* graphics) {
-		(void)graphics;
+    _export void __cdecl on_unload() {
+		
     }
 
 	_export void __cdecl on_play_begin() {
@@ -251,9 +257,8 @@ extern "C" {
 		(void)delta;
     }
 
-	_export void __cdecl on_render(Graphics_Context* graphics) {
-		(void)graphics;
-
+	_export void __cdecl on_render() {
+        Graphics_Context* graphics = get_graphics();
         auto windows = graphics->get_windows_context();
         auto wnd = windows->main_window_handle;
         f32 delta = (f32)windows->window_info[wnd].delta_time;
@@ -276,16 +281,12 @@ extern "C" {
 
             u64 nparticles = (u64)(sim.state.time_passed * sim.spawn_rate);
 
-            if (!renderer_module) {
-                renderer_module = get_module("ecs_2d_renderer");
-            }
-
-            if (renderer_module && renderer_module->is_loaded && sim.preview_in_editor) {
-                auto req = Ecs_2D_Renderer_Request(ECS_2D_RENDERER_REQUEST_GET_EDITOR_VIEW);
-                Editor_View* editor_cam = renderer_module->request<Editor_View*>(req);
+            if (g_editor_module && g_editor_module->is_loaded && sim.preview_in_editor) {
+                auto functions = (Editor_2D_Function_Library*)g_editor_module->get_function_library();
+                auto editor_view = functions->get_view();
 
                 switch (sim.type) {
-                    case PARTICLE_POINTS: render_points(graphics, point_render_context, nparticles, editor_cam->transform, editor_cam->ortho, editor_cam->render_target, sim, transform); break;
+                    case PARTICLE_POINTS: render_points(graphics, point_render_context, nparticles, editor_view->transform, editor_view->ortho, editor_view->render_target, sim, transform); break;
                     default: break;
                 }
             } 
@@ -305,7 +306,7 @@ extern "C" {
 	}
 
 
-	_export void __cdecl on_gui(Graphics_Context* graphics) {
-		(void)graphics;
+	_export void __cdecl on_gui() {
+		
 	}
 }

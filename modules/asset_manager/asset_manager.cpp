@@ -1,3 +1,5 @@
+#include <random>
+
 #include "apparatus.h"
 
 #include "asset_manager.h"
@@ -37,6 +39,33 @@ struct Asset_Directory {
     }
 };
 
+struct Asset_Loader {
+    Asset_Loader(const Asset_Loader_Specification& r) {
+        extensions = r.extensions;
+        tell_size = r.tell_size;
+        load = r.load;
+        unload = r.unload;
+        on_gui = r.on_gui;
+        set_default_params = r.set_default_params;
+        param_size = r.param_size;
+        creatable = r.creatable;
+        asset_icon = r.icon;
+        strcpy(name, r.name);
+    }
+    Hash_Set<Dynamic_String> extensions;
+	std::function<size_t(str_ptr_t, void*)> tell_size = 0;
+	std::function<byte*(byte*, str_ptr_t, void*)> load = 0;
+	std::function<void(byte*)> unload = 0;
+    std::function<void(void*)> on_gui = 0; 
+    std::function<void(void*)> set_default_params = 0;
+    size_t param_size;
+    name_str_t name = "N/A";
+
+    bool creatable;
+
+    Icon_Type asset_icon = ICON_TYPE_FILE;
+};
+
 Gui_Window g_asset_manager = { true, "Asset Manager" };
 Gui_Window g_asset_inspector = { false, "Asset Inspector" };
 
@@ -48,17 +77,17 @@ path_str_t g_assets_dir;
 Dynamic_Array<Asset> assets;
 Dynamic_Array<byte> runtime_data;
 
+Dynamic_Array<Asset_Loader> loaders;
+
 // Sorted by usage frequency
 Dynamic_Array<asset_id_t> order_to_unload_assets;
 
 u32 number_of_assets_in_use = 0;
 
-Graphics_Context* g_graphics;
-
 Asset_Directory* g_root_directory = NULL;
 Asset_Directory* g_selected_dir = NULL;
 
-constexpr str_ptr_t disk_file_name = "assetlist";
+asset_id_t g_selected_asset = NULL_ASSET_ID;
 
 Hash_Set<u32> taken_uids;
 
@@ -92,10 +121,11 @@ asset_id_t make_id(u32 index, u32 uid) {
 }
 
 u32 generate_uid() {
-    
-    u32 uid = rand() % UINT_MAX;
+    std::mt19937 rng;
+    rng.seed((u32)time(NULL));
+    u32 uid = rng() % UINT_MAX;
     while (taken_uids.find(uid) != taken_uids.end() && uid == (u32)-1) {
-        uid = rand() % UINT_MAX;
+        uid = rng() % UINT_MAX;
     }
     taken_uids.emplace(uid);
     return uid;
@@ -105,67 +135,56 @@ bool is_uid_available(u32 uid) {
     return taken_uids.find(uid) == taken_uids.end() && uid != (u32)-1;
 }
 
-data_index_t load_texture(Asset* asset) {
-    Texture_Data tex;
-    
-    tex.graphics_id = g_graphics->make_texture(G_BUFFER_USAGE_STATIC_WRITE);
-    auto* img = load_image_from_file(asset->path, &tex.size.x, &tex.size.y, &tex.channels, 4);
-
-    if (!img) {
-        log_error("Failed loading texture from: \n{}\nReason: ", get_failure_reason());
-        return NULL_DATA_INDEX;
-    }
-
-    g_graphics->set_texture_filtering(tex.graphics_id, G_MIN_FILTER_NEAREST, G_MAG_FILTER_NEAREST);
-    g_graphics->set_texture_wrapping(tex.graphics_id, G_WRAP_CLAMP_TO_BORDER);
-
-    static std::thread::id this_thread = std::this_thread::get_id();
-    ap_assert(this_thread == std::this_thread::get_id(), "I sayeth, Nay Thee! ({}, {})", this_thread, std::this_thread::get_id());
-
-    size_t img_size = tex.size.width * tex.size.height * tex.channels;
-
-    data_index_t data_index = runtime_data.size();
-    runtime_data.resize(runtime_data.size() + sizeof(Texture_Data) + img_size);
-    tex.data = &runtime_data[data_index + sizeof(Texture_Data)];
-
-    memcpy(&runtime_data[data_index], &tex, sizeof(Texture_Data));
-    memcpy(&runtime_data[data_index + sizeof(Texture_Data)], img, img_size);
-
-    g_graphics->set_texture_data(tex.graphics_id, (byte*)tex.data, tex.size, G_TEXTURE_FORMAT_RGBA);
-
-    free_image(img);
-
-    return data_index;
-}
-
-bool unload_texture(Asset* asset) {
-    asset->is_garbage = true;
-
-    auto& tex = *(Texture_Data*)asset->get_runtime_data();
-    
-    g_graphics->destroy_texture(tex.graphics_id);
-
-    return true;
-}
-
-asset_id_t register_asset(str_ptr_t path, asset_type_t asset_type, u32 uid = (u32)-1) {
+asset_id_t register_asset(str_ptr_t path, u32 uid = (u32)-1, void* params = NULL) {
     
     Asset a;
     a.is_garbage = false;
+
+    path_str_t dir = "";
+    Path::directory_of(path, dir);
+
     strcpy(a.path, path);
     Path::extension_of(path, a.extension);
     Path::name_with_extension(path, a.file_name);
     Path::name_without_extension(path, a.name);
+    sprintf(a.meta_path, "%s/%s.%s", dir, a.name, "ap");
 
-    a.asset_type = asset_type;
+    bool any_loader = false;
+    index_t i = 0;
+    for (auto& loader : loaders) {
+        if (loader.extensions.count(a.extension) > 0) {
+            if (params) {
+                a.load_param = params;
+            } else {
+                a.load_param = malloc(loader.param_size);
+                loader.set_default_params(a.load_param);
+            }
+
+            a.loader = i;
+
+            a.icon = loader.asset_icon;
+
+            strcpy(a.type, loader.name);
+
+            any_loader = true;
+            break;
+        }
+        i++;
+    }
+
+    if (!any_loader) {
+        log_warn("Could not find loader for extension '{}'", a.extension);
+        return NULL_ASSET_ID;
+    }
+
     a.data_stream = &runtime_data;
 
     u32 index = (u32)-1;
 
-    for (int i = 0; i < assets.size(); i++) {
+    for (i = 0; i < assets.size(); i++) {
         if (assets[i].is_garbage) {
             assets[i] = std::move(a);
-            index = i;
+            index = (u32)i;
         }
     }
 
@@ -189,29 +208,24 @@ asset_id_t register_asset(str_ptr_t path, asset_type_t asset_type, u32 uid = (u3
     return id;
 }
 
-asset_id_t register_by_extension(str_ptr_t path, u32 uid = (u32)-1) {
-    str16_t ext = "";
-    Path::extension_of(path, ext);
-    if (strcmp(ext, "png") == 0) {
-        auto id = register_asset(path, ASSET_TYPE_TEXTURE, uid);
-        
-        return id;
-    } else {
-        log_error("Cannot load files with extension '{}'", ext);
-        return NULL_ASSET_ID;
-    }
-}
-
 data_index_t load_to_memory(asset_id_t id) {
     u32 index = get_index(id);
     ap_assert(index < assets.size());
     Asset* asset = &assets[index];
-    
-    data_index_t data_index = load_texture(asset);
-    
-    if (data_index == NULL_DATA_INDEX) {
-        return NULL_DATA_INDEX;
-    }
+
+    data_index_t data_index = runtime_data.size();
+
+    auto& loader = loaders[asset->loader];
+
+    size_t sz = loader.tell_size(asset->path, asset->load_param);
+
+    runtime_data.resize(runtime_data.size() + sz);
+
+    byte* stream = runtime_data.data() + data_index;
+
+    byte* end = loader.load(stream, asset->path, asset->load_param);
+    (void)end;
+    ap_assert((uintptr_t)(end - stream) == (uintptr_t)sz, "Return value from load() mismatch with tell_size()");
 
     asset->in_memory = true;
 
@@ -224,7 +238,8 @@ bool unload_from_memory(asset_id_t id) {
     Asset* asset = &assets[index];
     ap_assert(!asset->in_use, "Cannot unload an asset that's in use");
 
-    if (!unload_texture(asset)) return false;
+    auto& loader = loaders[asset->loader];
+    loader.unload(runtime_data.data() + asset->data_index);
 
     asset->in_memory = false;
 
@@ -240,6 +255,9 @@ void delete_asset(asset_id_t id) {
     if (asset.in_memory) {
         unload_from_memory(id);
     }
+
+    free(asset.load_param);
+    asset.load_param = NULL;
 }
 
 Asset* begin_use(asset_id_t id) {
@@ -287,6 +305,21 @@ void do_asset_manager_menu_gui(Asset_Directory* dir) {
             }
         }
 
+        for (auto& loader : loaders) {
+            if (loader.creatable && ImGui::MenuItem(loader.name)) {
+                path_str_t new_path = "";
+                sprintf(new_path, "%s/%s.%s", dir->real_path, create_name, (*loader.extensions.begin()).c_str());
+                if (Path::create_file(new_path)) {
+                    auto aid = register_asset(new_path);
+                    if (aid != NULL_ASSET_ID) {
+                        dir->assets.emplace(aid);
+                    }
+                } else {
+                    log_error("Failed creating file at '{}'", new_path);
+                }
+            }
+        }
+
         ImGui::EndMenu();
     }
 
@@ -300,7 +333,8 @@ void do_asset_manager_menu_gui(Asset_Directory* dir) {
                 sprintf(new_path, "%s/%s", dir->real_path, file_name);
                 Path::copy(result_path, new_path);
 
-                auto id = register_by_extension(new_path);
+
+                auto id = register_asset(new_path);
                 if (id != NULL_ASSET_ID) {
                     dir->assets.emplace(id);
                 }
@@ -311,7 +345,7 @@ void do_asset_manager_menu_gui(Asset_Directory* dir) {
 
 void clear_assets() {
     for (auto& asset : assets) {
-        ap_assert(!asset.in_use, "Asset is left in use when asset system is loaded");
+        ap_assert(!asset.in_use, "Asset is left in use when clearing asset system");
         if (asset.in_memory) unload_from_memory(asset.id);
     }
     assets.clear();
@@ -320,10 +354,54 @@ void clear_assets() {
     taken_uids.clear();
 }
 
+bool validate(asset_id_t* paid) {
+    asset_id_t& aid = *paid;
+
+    if (aid == NULL_ASSET_ID) return false;
+
+    auto idx = get_index(aid);
+    auto uid = get_uid(aid);
+
+    // If index is in range, asset isnt garbage and ids match - aid is valid.
+    if (idx >= 0 && idx < assets.size() && !assets[idx].is_garbage && assets[idx].id == aid)
+        return true;
+
+    for (auto& asset : assets) {
+        auto asset_idx = get_index(asset.id);
+        auto asset_uid = get_uid(asset.id);
+
+        if (asset.id == aid) {
+            bool ret =  !asset.is_garbage;
+            if (!ret) *paid = NULL_ASSET_ID;
+            return ret;
+        }
+
+        // Unique id's match but not index; valid asset uid but
+        // index has become incorrect when loading from disk
+        if (uid == asset_uid && idx != asset_idx) {
+            set_index(paid, asset_idx);
+            bool ret =  !asset.is_garbage;
+            if (!ret) *paid = NULL_ASSET_ID;
+            return ret;
+        }
+    }
+
+    *paid = NULL_ASSET_ID;
+    return false;
+}
+
+Asset_Loader* get_loader(str_ptr_t ext) {
+    for (auto& loader : loaders) {
+        if (loader.extensions.count(ext) > 0) return &loader;
+    }
+    return NULL;
+}
+
 extern "C" {
-    _export void __cdecl on_load(Graphics_Context* graphics) {
-        (void)graphics;
+    _export void __cdecl on_load() {
         srand((u32)time(NULL));
+
+        Graphics_Context* graphics = get_graphics();
 
         path_str_t folder_icon_path = "";
         path_str_t file_icon_path = "";
@@ -342,29 +420,39 @@ extern "C" {
         };
 
         register_gui_popup(&g_manager_menu_popup);
-
-        g_graphics = graphics;
     }
 
     _export void __cdecl save_to_disk(str_ptr_t dir) {
-        path_str_t file_path = "";
-        sprintf(file_path, "%s/%s", dir, disk_file_name);
+        (void)dir;
 
-        std::ofstream ostream;
-        ostream.open(file_path);
+        sprintf(g_assets_dir, "%s/assets", dir);
 
-        for (u32 i = 0; i < assets.size(); i++) {
-            if (assets[i].is_garbage) continue;
+        // Clean up all previous meta files
+        Path::iterate_directories(g_assets_dir, [](str_ptr_t entry){
+            path_str_t ext = "";
+            Path::extension_of(entry, ext);
 
-            path_str_t rel_path = "";
-            Path::to_relative(assets[i].path, dir, rel_path);
-            ostream << assets[i].id << " " << rel_path << "\n";
+            if (strcmp(ext, "ap") == 0) {
+                Path::remove(entry);
+            }
+        }, true);
+
+        // Write all meta files
+        for (auto& asset : assets) {
+            Binary_Archive params_archive(asset.meta_path);
+
+            auto& loader = loaders[asset.loader];
+
+            params_archive.write<u32>("uid", get_uid(asset.id));
+            params_archive.write("params", asset.load_param, loader.param_size);
+
+            params_archive.flush();
         }
 
-        ostream.close();
     }
 
     _export void __cdecl load_from_disk(str_ptr_t dir) {
+        
         clear_assets();
 
         sprintf(g_assets_dir, "%s/assets", dir);
@@ -373,24 +461,8 @@ extern "C" {
         g_root_directory = new Asset_Directory(NULL, g_assets_dir);
         g_selected_dir = g_root_directory;
 
-        path_str_t file_path = "";
-        sprintf(file_path, "%s/%s", dir, disk_file_name);
-
         sprintf(g_assets_dir, "%s/assets", dir);
         if (!Path::exists(g_assets_dir)) Path::create_directory(g_assets_dir);
-
-        if (!Path::exists(file_path)) {
-            log_warn("No assets file found at\n{}", file_path);
-            return;
-        }
-
-
-        File_Info info;
-        Path::get_info(file_path, &info);
-
-        char* data = (char*)malloc(info.size);
-
-        Path::read_all_bytes(file_path, (byte*)data, info.size);
 
         Path::iterate_directories(g_assets_dir, [](str_ptr_t entry) {
             if (Path::is_directory(entry)) {
@@ -401,53 +473,66 @@ extern "C" {
                         dir.sub_directories.push_back(new Asset_Directory(&dir, entry));
                     }
                 });
+            } else if (Path::is_file(entry)) {
+                path_str_t ext = "";
+                Path::extension_of(entry, ext);
+                if (strcmp(ext, "ap") != 0) {
+                    auto* loader = get_loader(ext);
+                    if (!loader) {
+                        log_error("Missing loader for asset at '{}'", entry);
+                        return;
+                    }
+                    path_str_t asset_dir = "";
+                    path_str_t meta_file = "";
+                    path_str_t asset_name = "";
+                    Path::directory_of(entry, asset_dir);
+                    Path::name_without_extension(entry, asset_name);
+                    sprintf(meta_file, "%s/%s.ap", asset_dir, asset_name);
+                    
+                    if (!Path::exists(meta_file)) {
+                        register_asset(entry);
+                    } else {
+                        Binary_Archive meta_archive(meta_file);
+
+                        if (meta_archive.is_valid_id("uid") && meta_archive.is_valid_id("params")) {
+                            u32 uid = meta_archive.read<u32>("uid");
+                            size_t params_size = 0;
+                            void* params = meta_archive.read("params", &params_size);
+                            if (params_size != loader->param_size) {
+                                params = NULL;
+                            } else {
+                                // Copy it, because the memory is freed when the archive
+                                // is freed
+                                void* params_copy = malloc(params_size);
+                                memcpy(params_copy, params, params_size);
+                                params = params_copy;
+                            }
+                            register_asset(entry, uid, params);
+                        } else {
+                            register_asset(entry);
+                        }
+                    }
+                }
             }
         }, true);
 
-        str_t<32> id_str = "";
-        path_str_t rel_path = "";
-        u8 stage = 0;
-        
-        path_str_t str = "";
-        for (int i = 0; i < info.size; i++) {
-            
-            if (data[i] == ' ' && stage == 0) {
-                stage = 1;
-                strcpy(id_str, str);
-                memset(str, 0, sizeof(str));
-            } else if (data[i] == '\n' || data[i] == '\r' || data[i] == '\r\n' && stage == 1) {
-                stage = 0;
-                strcpy(rel_path, str);
-                memset(str, 0, sizeof(str));
-
-                path_str_t asset_path = "";
-                sprintf(asset_path, "%s/%s", dir, rel_path);
-                if (Path::can_open(asset_path)) {
-                    asset_id_t aid = register_by_extension(asset_path, get_uid(atoll(id_str)));
-                    path_str_t asset_dir = "";
-                    Path::directory_of(asset_path, asset_dir);
-                    g_root_directory->traverse([&](Asset_Directory& dir) {
-                        if (Path::equals(dir.real_path, asset_dir)) {
-                            dir.assets.emplace(aid);
-                        }
-                    });
+        g_root_directory->traverse([](Asset_Directory& dir) {
+            for (auto& asset : assets) {
+                path_str_t asset_dir = "";
+                Path::directory_of(asset.path, asset_dir);
+                if (Path::equals(asset_dir, dir.real_path)) {
+                    dir.assets.emplace(asset.id);
                 }
-            } else {
-                char c[2]; c[1] = '\0'; c[0] = data[i];
-                strcat(str, c);
             }
-        }
-
-        free(data);
+        });
     }
 
-    _export void __cdecl on_unload(Graphics_Context* graphics) {
-        (void)graphics;
-
+    _export void __cdecl on_unload() {
         clear_assets();
+        if (g_root_directory) delete g_root_directory;
 
         unregister_gui_window(&g_asset_manager);
-            unregister_gui_window(&g_asset_inspector);
+        unregister_gui_window(&g_asset_inspector);
 
         unregister_gui_popup(&g_manager_menu_popup);
     }
@@ -458,13 +543,8 @@ extern "C" {
 
     }
 
-    _export void __cdecl on_render(Graphics_Context* graphics) {
-        auto windows = graphics->get_windows_context();
-        auto wnd = windows->main_window_handle;
-
-        if (windows->should_close(wnd)) {
-            quit();
-        }
+    _export void __cdecl on_render() {
+        
     }
 
     void do_dir_gui(Asset_Directory& dir, int depth = 0) {
@@ -500,15 +580,27 @@ extern "C" {
                 auto asset_id = (asset_id_t)(uintptr_t)payload->value;
                 auto* prev_dir = (Asset_Directory*)payload->home;
 
-                prev_dir->assets.erase(asset_id);
-                dir.assets.emplace(asset_id);
-
                 Asset& asset = assets[get_index(asset_id)];
+
                 path_str_t prev_path = "";
+                path_str_t prev_meta_path = "";
                 strcpy(prev_path, asset.path);
+                strcpy(prev_meta_path, asset.meta_path);
                 sprintf(asset.path, "%s/%s", dir.real_path, asset.file_name);
 
-                Path::copy(prev_path, asset.path);
+                path_str_t asset_dir = "";
+                Path::directory_of(asset.path, asset_dir);
+                sprintf(asset.meta_path, "%s/%s.ap", asset_dir, asset.name);
+
+                if (Path::copy(prev_path, asset.path).value() == 0) {
+                    dir.assets.emplace(asset_id);
+                    Path::copy(prev_meta_path, asset.meta_path);
+
+                    if (Path::remove(prev_path).value() == 0) {
+                        prev_dir->assets.erase(asset_id);
+                        Path::remove(prev_meta_path);
+                    }
+                }
             }
             ImGui::EndDragDropTarget();
         }
@@ -524,25 +616,21 @@ extern "C" {
             for (auto asset_id : dir.assets) {
                 auto& asset = assets[get_index(asset_id)];
 
-                if (asset.asset_type == ASSET_TYPE_TEXTURE) {
-                    ImGui::Icon(ICON_TYPE_TEXTURE, { 16, 16 });
-                } else {
-                    ImGui::Icon(ICON_TYPE_FILE, { 16, 16 });
-                }
+                ImGui::Icon(asset.icon, { 16, 16 });
                 vline_end = ImGui::GetItemRectMin();
                 vline_end.y += 8;
                 f32 x = vline_start.x > vline_end.x ? vline_end.x : vline_start.x;
                 draw_list->AddLine(vline_end, { x, vline_end.y }, ImGui::GetColorU32(ImGuiCol_Text));
                 ImGui::SameLine();
-                if (ImGui::Selectable(asset.file_name)) {
-                    
+                if (ImGui::Selectable(asset.name, g_selected_asset == asset.id)) {
+                    g_selected_asset = asset.id;
                 }
                 if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoDisableHover | ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
                     Gui_Payload payload;
                     payload.home = &dir;
                     payload.value = (void*)(uintptr_t)asset_id;
                     ImGui::SetDragDropPayload("asset", &payload, sizeof(Gui_Payload));
-                    ImGui::Text(asset.file_name);
+                    ImGui::Text(asset.name);
                     ImGui::EndDragDropSource();
                 }
             }
@@ -554,9 +642,7 @@ extern "C" {
         depth++;
     }
 
-    _export void __cdecl on_gui(Graphics_Context* graphics) {
-        (void)graphics;
-
+    _export void __cdecl on_gui() {
         ImGui::DoGuiWindow(&g_asset_manager, [&]() {
 
             ImGui::BeginMenuBar();
@@ -571,43 +657,63 @@ extern "C" {
 
         ImGui::DoGuiWindow(&g_asset_inspector, [&]() {
 
+            if (validate(&g_selected_asset)) {
+                Asset& asset = assets[get_index(g_selected_asset)];
+                auto& loader = loaders[asset.loader];
+
+                ImGui::Text("%s (%s)", asset.file_name, loader.name);
+                ImGui::Separator();
+                loader.on_gui(asset.load_param);
+
+                ImGui::Separator();
+
+                if (ImGui::Button("Reload") && asset.in_memory) {
+                    unload_from_memory(g_selected_asset);
+                    load_to_memory(g_selected_asset);
+                }
+            }
+
         });
     }
 
-    _export void* __cdecl _request(void* ud) {
-        Asset_Request* req = (Asset_Request*)ud;
-        if (req->request_id == ASSET_REQUEST_REGISTER_ASSET) {
-            auto* request = (Asset_Request_Register_Asset*)req;
-            
-            if (request->asset_type == ASSET_TYPE_TEXTURE) {
-                return (void*)(uintptr_t)register_asset(request->path, request->asset_type);
+    _export void* __cdecl get_function_library() {
+
+        static Asset_Manager_Function_Library lib;
+
+        lib.begin_use = begin_use;
+        lib.end_use = end_use;
+        lib.validate = validate;
+        lib.view = [](asset_id_t aid) {
+            if (validate(&aid)) {
+                return &assets[get_index(aid)];
             } else {
-                log_error("Invalid asset type in register asset request");
-                return NULL;
+                return (Asset*)nullptr;
             }
-        } else if (req->request_id == ASSET_REQUEST_BEGIN_USE_ASSET) {
-            auto* request = (Asset_Request_Begin_Use_asset*)req;
+        };
+        lib.register_loader = [](const Asset_Loader_Specification& spec) {
+            auto assure = [](bool val, str_ptr_t err) {
+                if (!val) log_error("Asset loader invalid: {}", err);
+                return val;
+            };
 
-            return begin_use(request->asset_id);
-        } else if (req->request_id == ASSET_REQUEST_END_USE_ASSET) {
-            auto* request = (Asset_Request_End_Use_Asset*)req;
+            if (!assure(spec.extensions.size() > 0, "Asset loader must handle at least one extension")) return;
+            if (!assure((bool)spec.tell_size, "Asset loader must have valid tell_size() function")) return;
+            if (!assure((bool)spec.load, "Asset loader must have valid load() function")) return;
+            if (!assure((bool)spec.unload, "Asset loader must have valid unload() function")) return;
+            if (!assure((bool)spec.set_default_params, "Asset loader must have valid set_default_params() function")) return;
+            if (!assure(spec.param_size > 0, "Asset loader param size must be > 0")) return;
+            
+            for (auto& loader : loaders) {
+                for (auto& ext : loader.extensions) {
+                    if (spec.extensions.count(ext) > 0) {
+                        log_warn("Loader for extension {} already exists, undefined behaviour follows...", ext);
+                    }
+                }
+            }
 
-            end_use(request->asset_id);
-            return NULL;
-        } else if (req->request_id == ASSET_REQUEST_CHECK_IF_VALID) {
-            auto* request = (Asset_Request_Check_If_Valid*)req;
-            u32 index = get_index(request->asset_id);
-            return (void*)(uintptr_t)(index < assets.size() && !assets[index].is_garbage);
-        } else if (req->request_id == ASSET_REQUEST_VIEW) {
-            auto* request = (Asset_Request_View*)req;
-            u32 index = get_index(request->asset_id);
-            if (index < assets.size() && !assets[index].is_garbage)
-                return &assets[index];
-            else
-                return NULL;
-        }
+            loaders.emplace_back(spec);
+        };
 
-        log_error("Invalid asset request");
-        return NULL;
+        return &lib;
     }
 }

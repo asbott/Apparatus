@@ -6,12 +6,14 @@
 
 #include "archive.h"
 
+#include "graphics/graphics_api.h"
+
 #include <imgui.h>
 
 typedef str_t<256> entity_name_t;
 typedef str_t<128> comp_name_t;
 
-constexpr u32 MAX_COMPONENTS_PER_ENTITY = 256;
+	constexpr u32 MAX_COMPONENTS_PER_ENTITY = 256;
 
 struct Property_Info {
 	std::function<void(void*)> on_gui;
@@ -34,6 +36,7 @@ struct Component_Info {
 	std::string name;
 	uintptr_t runtime_id;
 	bool has_custom_gui;
+	size_t size;
 
 	std::vector<Property_Info> properties;
 };
@@ -105,7 +108,7 @@ namespace ImGui {
 	}
 
 	AP_API void Icon(Icon_Type icon, mz::ivec2 size);
-	AP_API bool IconButton(Icon_Type icon, mz::ivec2 size, const mz::color& bgr_color = 0);
+	AP_API bool IconButton(Icon_Type icon, mz::ivec2 size, const mz::color& bgr_color = 0, bool border = false);
 }
 
 enum class File_Browser_Mode {
@@ -115,6 +118,8 @@ enum class File_Browser_Mode {
 struct Graphics_Context;
 
 void AP_API quit();
+
+AP_API Graphics_Context* get_graphics();
 
 // Get input polling for the game window
 AP_API Game_Input* game_input();

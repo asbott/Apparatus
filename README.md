@@ -1,7 +1,13 @@
 # Apparatus
-Modular cross-platform application engine/framework
+Modular game engine with fully native runtime gameplay
+programming.
 
+# Building
+After cloning the repo, make sure all git modules are initialized and updated:
+`git submodule update --init`
+<br>Then simply generate project files with premake5. From the repo directory, run: `premake5.exe vs2019` (windows).
 
+I haven't built with anything except visual studio in a while, so it's likely that it won't compile with anything else. Definitely won't compile on any other os than windows right now.
 
 # Showcase
 Runtime management of entites/components (entt backend)

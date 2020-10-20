@@ -46,6 +46,14 @@ namespace Path {
         return true;
     }
 
+    bool create_file(str_ptr_t path) {
+        std::ofstream ostr(path);
+        bool good = ostr.good();
+        ostr.close();
+
+        return good;
+    }
+
     bool create_directory(str_ptr_t path) {
         std::error_code err;
         fs::create_directories(path, err);
@@ -59,7 +67,10 @@ namespace Path {
 
     std::error_code remove(str_ptr_t path) {
         std::error_code err;
-        ::fs::remove(path, err);
+        if (is_file(path))
+            ::fs::remove(path, err);
+        else 
+            ::fs::remove_all(path, err);
 
         return err;
     }

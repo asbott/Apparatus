@@ -110,3 +110,7 @@
 #else
 	#define debug_only(x) x
 #endif
+
+#define AP_NS_BEGIN(x) namespace x {
+
+#define AP_NS_END(x) }

@@ -19,11 +19,9 @@ Binary_Archive::Binary_Archive(str_ptr_t file_path, size_t hint_size) : file_pat
         Path::read_all_bytes(file_path, buffer_head, finfo.size);
 
         byte* buffer_ptr = buffer_head;
-        for (int i = 0; i < finfo.size; i++) {
-            if (buffer_head[i] == '\r\n') buffer_head[i] = '\n';
-        }
 
-        if (memcmp(buffer_ptr, HEADER_TOKEN, sizeof(HEADER_TOKEN)-1) != 0) return;
+        if (finfo.size <= sizeof(HEADER_TOKEN) - 1) return;
+        if (memcmp(buffer_head, HEADER_TOKEN, sizeof(HEADER_TOKEN)-1) != 0) return;
 
         buffer_ptr += sizeof(HEADER_TOKEN)-1;
 
@@ -68,7 +66,7 @@ Binary_Archive::Binary_Archive(str_ptr_t file_path, size_t hint_size) : file_pat
 
             if (mode == 3) {
                 size_t size_nbytes = sz_end_pos - sz_pos;
-                str_t<sizeof(size_t) + 1> size_str; memset(size_str, 0, sizeof(size_str));
+                str_t<sizeof(size_t) + 1> size_str = ""; memset(size_str, 0, sizeof(size_str));
                 memcpy(size_str, sz_pos, size_nbytes);
                 size_t item_size = atoll(size_str);
                 if (buffer_ptr == item_pos + item_size) {

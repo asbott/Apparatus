@@ -10,6 +10,8 @@ Module::Module(path_str_t mod_path, path_str_t mod_path_new, name_str_t str_id) 
 
 bool Module::load() {
 
+    log_trace("Loading module {}", str_id);
+
     if (Path::can_open(mod_path)) {
         auto err = Path::remove(mod_path);
         ap_assert(err.value() == 0, "Remove fail: {}", err.message());
@@ -24,7 +26,7 @@ bool Module::load() {
 
     #define _mod_load_fn(n) \
     n = (n##_t)os::load_module_function(os_mod, #n);\
-    if (!n) { log_warn("Could not find function in module: " #n); n = NULL; }
+    if (!n) { log_trace("Could not find function in module: " #n); n = NULL; }
 
     _mod_load_fn(on_load);
     _mod_load_fn(on_unload);
@@ -48,13 +50,16 @@ bool Module::load() {
 
     _mod_load_fn(set_imgui_context);
 
-    _mod_load_fn(_request);
+    _mod_load_fn(get_function_library);
+
+    log_info("Successfully loaded module '{}'", str_id);
 
     is_loaded = true;
     return true;
 }
 
 bool Module::unload() {
+    log_trace("Unloading module '{}'", str_id);
     if (!os_mod) return false;
     os::free_module(os_mod);
 

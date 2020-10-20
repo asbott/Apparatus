@@ -360,6 +360,26 @@ std::ostream& operator<<(std::ostream& os, const Token::Kind& kind) {
     return os << names[static_cast<int>(kind)];
 }
 
+struct Tag {
+    Tag(const std::string& str, const std::set<std::string>& args) 
+        : str(str), args(args) {}
+    Tag(const std::string& str) : str(str), args({}) {}
+    std::string str;
+    std::set<std::string> args;
+
+    friend bool operator < (const Tag& lhs, const Tag& rhs) {
+        return lhs.str < rhs.str;
+    }
+
+    bool operator ==(const std::string& rhs) {
+        return str == rhs;
+    }
+
+    operator std::string& () {
+        return str;
+    }
+};
+
 namespace fs = std::filesystem;
 
 std::string output_file;
@@ -376,6 +396,8 @@ void done(int code) {
     }
     std::cout << "====================================================================================\n";
 
+    //std::cin.get();
+
     exit(code);
 }
 
@@ -386,8 +408,8 @@ int main(int argc, char** argv) {
 	std::cout << "====================================================================================\n";
 	std::cout << "Running AP parser\n\n";
 
-    output_file = argv[1];
-    target_directory = argv[2];
+    output_file = argv[1];//"D:\\dev\\Apparatus\\modules\\ecs_2d_renderer\\_generated.cpp";//;
+    target_directory = argv[2];//"D:\\dev\\Apparatus\\modules\\ecs_2d_renderer";//argv[2];
     if (target_directory[target_directory.length() - 1] == '"') target_directory.pop_back();
 	
     std::cout << output_file << "\n";
@@ -448,6 +470,7 @@ int main(int argc, char** argv) {
 #include <functional>
 
 #include <misc/cpp/imgui_stdlib.h>
+#include <asset_manager/asset_manager.h>
 
 Hash_Set<uintptr_t> runtime_ids;
 Hash_Map<std::string, uintptr_t> name_id_map;
@@ -528,14 +551,18 @@ extern "C" {
 
     output_stream << upper_code;
 
+    
+
+    typedef std::set<Tag> Tag_List;
+
     struct Field_Item {
         std::string name;
         std::string property_type;
-        std::set<std::string> tags;
+        Tag_List tags;
     };
 
     struct Struct_Item {
-        std::set<std::string> tags;
+        Tag_List tags;
         std::string name;
         std::vector<Field_Item> members;
     };
@@ -545,7 +572,7 @@ extern "C" {
 
     std::vector<Struct_Item> structs;
     std::vector<Token> previous_tokens;
-    std::set<std::string> tags;
+    Tag_List tags;
 
     bool in_struct = false;
 
@@ -560,24 +587,59 @@ extern "C" {
                 in_struct = false;
             }
             if (token.is(Token::Kind::Identifier) && token.lexeme() == "tag") {
-                auto next = lex.next();
-                if (!next.is(Token::Kind::LeftParen)) {
+                token = lex.next();
+                if (!token.is(Token::Kind::LeftParen)) {
                     std::cout << red << "Expected '(' for tag list open\n" << white;
                     done(-1);
                 }
-                next = lex.next();
-                while (!is_end(next) && next.is_not(Token::Kind::RightParen)) {
-                    if (!next.is_one_of(Token::Kind::Comma, Token::Kind::Identifier)) {
-                        std::cout << red << "Unexpected token in tags list" << white;
+                token = lex.next();
+                while (!is_end(token) && token.is_not(Token::Kind::RightParen)) {
+                    if (!token.is_one_of(Token::Kind::Comma, Token::Kind::Identifier)) {
+                        std::cout << red << "Unexpected token'" << token.lexeme() << "' in tags list" << white;
                         done(-1);
                     }
-                    if (next.is(Token::Kind::Identifier)) {
-                        std::cout << "\nFound tag '" << next.lexeme() << "'\n";
-                        tags.emplace(next.lexeme());
+                    if (token.is(Token::Kind::Identifier)) {
+                        std::cout << "\nFound tag '" << token.lexeme() << "'\n";
+
+                        bool is_args = false;
+                        auto next = lex.next();
+                        std::set<std::string> args;
+                        if (next.is(Token::Kind::LeftParen)) {
+                            is_args = true;
+                            std::string str_arg = "";
+                            bool in_str = false;
+                            next = lex.next();
+                            while (!next.is(Token::Kind::RightParen)) {
+                                if (next.is(Token::Kind::SingleQuote) && !in_str) {
+                                    in_str = true;
+                                    next = lex.next();
+                                }
+                                if (next.is(Token::Kind::SingleQuote) && in_str) {
+                                    in_str = false;
+                                    args.emplace(str_arg);
+                                    str_arg = "";
+                                    next = lex.next();
+                                }
+
+                                if (next.is(Token::Kind::Identifier) || next.is(Token::Kind::Number)) {
+                                    if (in_str) {
+                                        str_arg += next.lexeme();
+                                    } else {
+                                        args.emplace(next.lexeme());
+                                    }
+                                }
+
+                                next = lex.next();
+                            }
+                        }
+                        tags.emplace(std::string(token.lexeme()), args);
+                        token = next;
+
+                    } else {
+                        token = lex.next();
                     }
-                    next = lex.next();
+                    
                 }
-                token = next;
             }
 
             if (token.is(Token::Kind::Identifier) && token.lexeme() == "struct") {
@@ -627,7 +689,7 @@ extern "C" {
 
     for (auto& struct_item : structs) {
         for (auto& tag : struct_item.tags) {
-            if (tag == "component") {
+            if (tag.str == "component") {
                 output_stream << "        {\n";
                 output_stream << "            uintptr_t id = (uintptr_t)typeid(" << struct_item.name << ").name();\n";
                 output_stream << "            runtime_ids.emplace(id);\n";
@@ -646,14 +708,15 @@ extern "C" {
                 output_stream << "            \n";
                 output_stream << "                \"" << struct_item.name << "\",\n";
                 output_stream << "                id,\n";
-                output_stream << "                " << (struct_item.tags.find("custom_gui") != struct_item.tags.end() ? "true" : "false")  << ",\n";
+                output_stream << "                " << (struct_item.tags.find(Tag("custom_gui")) != struct_item.tags.end() ? "true" : "false")  << ",\n";
+                output_stream << "                sizeof(" << struct_item.name << "),\n";
 
                 output_stream << "                std::vector<Property_Info> {\n";
                 std::vector<std::string> sizeofs;
                 for (auto& member : struct_item.members) {
                     std::cout << "\n" << member.name << "\n";
                     std::string this_sizeof = "sizeof(" + member.property_type + ")";
-                    if (member.tags.find("property") != member.tags.end() || struct_item.tags.find("custom_gui") != struct_item.tags.end()) {
+                    if (member.tags.find(Tag("property")) != member.tags.end() || struct_item.tags.find(Tag("custom_gui")) != struct_item.tags.end()) {
                         std::string this_offset = "";
                         for (auto& asizeof : sizeofs) this_offset += asizeof+ + "+";
                         if (this_offset.size() > 1) this_offset.pop_back();
@@ -661,33 +724,17 @@ extern "C" {
                         output_stream << "                    Property_Info { \n";
                         output_stream << "                        [](void* data) {\n";
 
-                        if (struct_item.tags.find("custom_gui") != struct_item.tags.end()) {
+                        if (struct_item.tags.find(Tag("custom_gui")) != struct_item.tags.end()) {
                             output_stream << "                            on_gui((" << struct_item.name << "*)data);\n";
-                        } else if (member.tags.find("string")  != member.tags.end()) {
+                        } else if (member.tags.find(Tag("string"))  != member.tags.end()) {
                             output_stream << "                            std::string s = (char*)data;\n";
                             output_stream << "                            ImGui::RInputText(\"" << member.name << "\", &s);\n";
                             output_stream << "                            strcpy((char*)data, s.c_str());\n";
-                        } else if (member.tags.find("color")  != member.tags.end()) {
+                        } else if (member.tags.find(Tag("color"))  != member.tags.end()) {
                             output_stream << "                            ImGui::RColorEdit4(\"" << member.name << "\", (f32*)data);\n";
-                        } else if (member.tags.find("texture")  != member.tags.end()) {
-                            output_stream << "                            (void)data;\n";
-                            output_stream << "                            Asset_Request_View view_request;\n";
-                            output_stream << "                            view_request.asset_id = *(asset_id_t*)data;\n";
-                            output_stream << "                            Asset* asset_view = get_module(\"asset_manager\")->request<Asset*>(view_request);\n";
-                            output_stream << "                            char na[] = \"<none>\";\n";
-                            output_stream << "                            if (asset_view) ImGui::RInputText(\"" << member.name << "\", asset_view->file_name, strlen(asset_view->file_name));\n";
-                            output_stream << "                            else ImGui::RInputText(\"" << member.name << "\", na, strlen(na));\n";
-                            output_stream << "                            if (ImGui::BeginDragDropTarget()) {\n";
-                            output_stream << "                                auto* p = ImGui::AcceptDragDropPayload(\"asset\");\n";
-                            output_stream << "                                if (p) {\n";
-                            output_stream << "                                    auto payload = (Gui_Payload*)p->Data;\n";
-                            output_stream << "                                    auto new_id = (asset_id_t)(uintptr_t)payload->value;\n";
-                            output_stream << "                                    view_request.asset_id = new_id;\n";
-                            output_stream << "                                    asset_view = get_module(\"asset_manager\")->request<Asset*>(view_request);\n";
-                            output_stream << "                                    if (asset_view && asset_view->asset_type == ASSET_TYPE_TEXTURE) memcpy(data, &new_id, sizeof(asset_id_t));\n";
-                            output_stream << "                                }\n";
-                            output_stream << "                            ImGui::EndDragDropTarget();\n";
-                            output_stream << "                            }\n";
+                        } else if (member.tags.find(Tag("asset"))  != member.tags.end() && (*member.tags.find(Tag("asset"))).args.size() > 0) {
+                            auto& arg = *(*member.tags.find(Tag("asset"))).args.begin();
+                            output_stream << "                            ImGui::InputAsset(\"" << member.name << "\", (asset_id_t*)data, \"" << arg << "\");";
                         } else { 
                             output_stream << "                            do_gui<" << member.property_type << ">(\"" << member.name << "\", (" << member.property_type << "*)data);\n";
                         }

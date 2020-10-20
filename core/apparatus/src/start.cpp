@@ -15,6 +15,15 @@
 
 #include "os.h"
 
+u64& uid_counter() {
+    static u64 n = 0;
+    return n;
+}
+
+u64 generate_unique_id() {
+    return uid_counter()++;
+}
+
 void graphics_debug_callback(graphics_enum_t severity, const char* msg, const char* fn) {
     char output_msg[4096] = "";
     sprintf(output_msg, "Graphics debug message (%s):\n%s\nIn '%s'", 
@@ -28,6 +37,14 @@ void graphics_debug_callback(graphics_enum_t severity, const char* msg, const ch
 }
 
 using namespace mz;
+
+struct Component_Reference {
+    void* data = NULL;
+    uintptr_t type = 0;
+    Module* mod = NULL;
+};
+
+Component_Reference component_clipboard;
 
 Graphics_Context* g_graphics;
 bool g_running = true;
@@ -65,6 +82,8 @@ path_str_t g_user_dir = "";
 path_str_t g_style_path = "";
 
 path_str_t g_ecs_dir = "";
+path_str_t g_temp_dir = "";
+path_str_t g_temp_ecs_dir = "";
 path_str_t g_project_dir = "";
 
 path_str_t g_browse_dir = "";
@@ -75,10 +94,12 @@ namespace ImGui {
         auto native = g_graphics->get_native_texture_handle(icons[icon]);
         ImGui::Image(native, size);
     }
-	bool IconButton(Icon_Type icon, mz::ivec2 size, const mz::color& bgr_color) {
+	bool IconButton(Icon_Type icon, mz::ivec2 size, const mz::color& bgr_color, bool border) {
         auto native = g_graphics->get_native_texture_handle(icons[icon]);
         if (bgr_color != mz::color(0)) ImGui::PushStyleColor(ImGuiCol_Button, bgr_color);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, (f32)border);
         bool pressed = ImGui::ImageButton(native, size, {0,0}, {1,1}, -1);
+        ImGui::PopStyleVar();
         if (bgr_color != mz::color(0)) ImGui::PopStyleColor();
         return pressed;
     }
@@ -86,6 +107,10 @@ namespace ImGui {
 
 void quit() {
     g_running = false;
+}
+
+Graphics_Context* get_graphics() {
+    return g_graphics;
 }
 
 Game_Input* game_input() {
@@ -130,7 +155,7 @@ void load_icon(Icon_Type type, str_ptr_t dir, str_ptr_t offset_path) {
 
     graphics_id_t icon = g_graphics->make_texture(G_BUFFER_USAGE_STATIC_WRITE);
 
-    g_graphics->set_texture_filtering(icon, G_MIN_FILTER_NEAREST, G_MAG_FILTER_NEAREST);
+    g_graphics->set_texture_filtering(icon, G_MIN_FILTER_LINEAR, G_MAG_FILTER_NEAREST);
 
     g_graphics->set_texture_wrapping(icon, G_WRAP_CLAMP_TO_BORDER);
 
@@ -200,7 +225,8 @@ bool is_playing() {
 }
 
 void to_file(entt::registry& reg, str_ptr_t dir_path) {
-    
+
+    auto res = Path::remove(dir_path);
     Path::create_directory(dir_path);
     reg.view<Entity_Info>().each([&reg, &dir_path](entt::entity entity, Entity_Info& entity_info) {
         path_str_t file_path = "";
@@ -328,7 +354,7 @@ s32 filter(u32 code, _EXCEPTION_POINTERS *ep, str_ptr_t mod_name, str_ptr_t mod_
         default:                                 descr = "N/A"; break;
     }
 
-    log_error("System level exception thrown\nException: {} ({})\nException address: {}\nIn module '{}'\nIn function '{}'",
+    log_error("System level exception thrown\nException: {} ({})\nException address: {}\nIn module '{}'\nWhen calling module function '{}'\nException thrown in function ''",
         descr, code, (uintptr_t)ep->ExceptionRecord->ExceptionAddress, mod_name, mod_fn);
     return EXCEPTION_EXECUTE_HANDLER;
 }
@@ -362,6 +388,7 @@ void save_user_settings(str_ptr_t dir) {
 }
 
 void load_user_settings(str_ptr_t dir) {
+
     path_str_t user_file = "";
     sprintf(user_file, "%s/window_states", dir);
     Binary_Archive archive(user_file);
@@ -460,12 +487,14 @@ void do_file_browser_gui() {
         };
         bool enter = ImGui::RInputText("name", new_dir_name, sizeof(new_dir_name), flags, char_filter);
 
-        if (strcmp(new_dir_name, "") != 0 && (enter || ImGui::MenuItem("Ok"))) {
+        if (strcmp(new_dir_name, "") != 0 && (enter || ImGui::Button("Ok##createdir"))) {
             path_str_t full_dir = "";
             sprintf(full_dir, "%s/%s", g_browse_dir, new_dir_name);
             log_trace(full_dir);
             Path::create_directory(full_dir);
             strcpy(new_dir_name, "");
+
+            ImGui::CloseCurrentPopup();
         }
         
         ImGui::EndMenu();
@@ -483,12 +512,13 @@ void do_file_browser_gui() {
 
             ImGui::Icon(ICON_TYPE_FOLDER, { 16, 16 });
             ImGui::SameLine();
-            if (ImGui::Selectable(dir_name)) {
-                if (g_browse_mode == File_Browser_Mode::file || ImGui::IsMouseDoubleClicked(0)) {
+            ImGui::Selectable(dir_name);
+            if (ImGui::IsItemClicked()) {
+                if (ImGui::IsMouseDoubleClicked(0)) {
                     strcpy(g_browse_dir, path);
-                    if (g_browse_mode != File_Browser_Mode::file) strcpy(file_browser_popup.return_value, g_browse_dir);
-                } else if (g_browse_mode != File_Browser_Mode::file)
+                } else if (g_browse_mode != File_Browser_Mode::file) {
                     strcpy(file_browser_popup.return_value, path);
+                }
             }
         }
     });
@@ -506,12 +536,32 @@ void do_file_browser_gui() {
             if (ImGui::Selectable(file_name, strcmp(path, file_browser_popup.return_value) == 0)) {
                 strcpy(file_browser_popup.return_value, path);
             }
+            if (ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked(0)) {
+                if (file_browser_popup.done_fn) {
+                    file_browser_popup.done_fn();
+                    file_browser_popup.done_fn = NULL;
+                }
+                ImGui::CloseCurrentPopup();
+            }
         }
     });
 
     ImGui::EndChildFrame();
 
     ImGui::Text("Selected: %s", file_browser_popup.return_value);
+
+    if (ImGui::Button("Ok")) {
+        if (file_browser_popup.done_fn) {
+            file_browser_popup.done_fn();
+            file_browser_popup.done_fn = NULL;
+        }
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) {
+        ImGui::CloseCurrentPopup();
+        file_browser_popup.done_fn = NULL;
+    }
 }
 
 bool load_module(Module* mod) {
@@ -519,13 +569,13 @@ bool load_module(Module* mod) {
     ap_assert(mod->init, "Init function missing in module '{}'", mod->str_id);
     mod->init();
 
-    invoke_mod_function(mod, on_load, void, g_graphics);
+    invoke_mod_function(mod, on_load, void);
 
     return true;
 }
 
 bool unload_module(Module* mod) {
-    invoke_mod_function(mod, on_unload, void, g_graphics);
+    invoke_mod_function(mod, on_unload, void);
     if (mod->is_loaded) {
         for (auto comp_id : mod->get_component_ids()) {
             g_reg.each([mod, comp_id](entt::entity entity) {
@@ -544,6 +594,7 @@ bool reload_module(Module* mod) {
 }
 
 void save_project() {
+    if (is_playing()) return;
     for (auto mod : g_modules) invoke_mod_function(mod, save_to_disk, void, g_project_dir);
     to_file(g_reg, g_ecs_dir);
     save_user_settings(g_user_dir);
@@ -551,8 +602,11 @@ void save_project() {
 }
 
 void load_project(str_ptr_t new_dir) {
+    if (is_playing()) return;
     strcpy(g_project_dir, new_dir);
     sprintf(g_ecs_dir, "%s/ecs", new_dir);
+    sprintf(g_temp_dir, "%s/.temp", new_dir);
+    sprintf(g_temp_ecs_dir, "%s/ecs", g_temp_dir);
     g_reg.clear();
     deselect_all_entities();
     for (auto mod : g_modules) if (mod->is_loaded) reload_module(mod); else load_module(mod);
@@ -563,6 +617,8 @@ void load_project(str_ptr_t new_dir) {
     load_user_settings(g_user_dir);
     ImGui::LoadStyleFromDisk(g_style_path);
 }
+
+
 
 int start(int argc, char** argv) {
     (void)argc;
@@ -577,8 +633,6 @@ int start(int argc, char** argv) {
     init_dependencies();
 
     set_logger_level(spdlog::level::trace);
-
-    
 
     auto exe = get_executable_path();
     char ext[1024] = "";
@@ -648,32 +702,12 @@ int start(int argc, char** argv) {
 
     manage_component_popup.is_modal = false;
     strcpy(manage_component_popup.str_id, "");
-    manage_component_popup.fn = []() {
-        if (ImGui::MenuItem("Remove")) {
-            strcpy(manage_component_popup.return_value, "Remove");
-            if (manage_component_popup.done_fn) manage_component_popup.done_fn();
-        }
-        
-    };  
 
     strcpy(file_browser_popup.str_id, "File Browser");
     file_browser_popup.is_modal = true;
     file_browser_popup.fn = []() {
 
         do_file_browser_gui();
-
-        if (ImGui::Button("Ok")) {
-            if (file_browser_popup.done_fn) {
-                file_browser_popup.done_fn();
-                file_browser_popup.done_fn = NULL;
-            }
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            ImGui::CloseCurrentPopup();
-            file_browser_popup.done_fn = NULL;
-        }
     };
 
     register_gui_popup(&add_component_popup);
@@ -690,30 +724,41 @@ int start(int argc, char** argv) {
 
     g_thread_server.wait_for_thread(g_graphics_thread);
 
-    register_module("test_module");
-    register_module("ecs_2d_renderer");
     register_module("asset_manager");
-    register_module("2d_physics");
+    register_module("2d_viewport");
+    register_module("2d_editor");
+
+    register_module("2d_sprite_renderer");
+    register_module("2d_tilemap_renderer");
+
     register_module("2d_particles_simulator");
 
+    register_module("2d_physics");
+    
+    register_module("test_module");
 
-    path_str_t font_path = "";
-    sprintf(font_path, "%s/input_mono.ttf", essential_dir);
-    ImFontConfig cfg;
-    cfg.OversampleH = 8;
-    cfg.OversampleV = 8;
-    cfg.RasterizerMultiply = 1.f;
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
+
     ImGui::GetIO().Fonts->AddFontDefault();
 
-    sprintf(font_path, "%s/louis_george.ttf", essential_dir);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13, &cfg);
-    ImGui::GetIO().FontDefault = ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14, &cfg);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15, &cfg);
+    path_str_t font_dir = "";
+    sprintf(font_dir, "%s/fonts", essential_dir);
+    path_str_t font_path = "";
+
+    sprintf(font_path, "%s/louis_george.ttf", font_dir);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 12);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15);
+
+    sprintf(font_path, "%s/gontserrat_regular.ttf", font_dir);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13);
+    ImGui::GetIO().FontDefault = ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15);
+
+    sprintf(font_path, "%s/gontserrat_semibold.ttf", font_dir);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 13);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 14);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path, 15);
     
     ImGui::GetIO().Fonts->Build();
 
@@ -750,6 +795,10 @@ int start(int argc, char** argv) {
             for (auto* mod : g_modules) invoke_mod_function(mod, on_update, void, delta);
         }
 
+        if (windows->should_close(wnd)) {
+            quit();
+        }
+
         log_context.do_gui(&log_window);
 
         static Dynamic_Array<Module*> to_reload;
@@ -761,7 +810,7 @@ int start(int argc, char** argv) {
             
             if (ImGui::RBeginCombo("Module", selected_module ? selected_module->str_id : "<none>")) {
                 for (auto mod : g_modules) {
-                    if (ImGui::Selectable(mod->str_id, mod == selected_module)) {
+                    if (mod && ImGui::Selectable(mod->str_id, mod == selected_module)) {
                         selected_module = mod;
                     }
                 }   
@@ -781,7 +830,7 @@ int start(int argc, char** argv) {
                 ImGui::Text("Has function '%s': %s", "on_play_stop",    selected_module->on_play_stop    ? "yes" : "no");
                 ImGui::Text("Has function '%s': %s", "save_to_disk",    selected_module->save_to_disk    ? "yes" : "no");
                 ImGui::Text("Has function '%s': %s", "load_from_disk",  selected_module->load_from_disk  ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "_request",        selected_module->_request        ? "yes" : "no");
+                ImGui::Text("Has function '%s': %s", "get_function_library",        selected_module->get_function_library        ? "yes" : "no");
 
                 if (selected_module->is_loaded) {
                     ImGui::Spacing();
@@ -806,12 +855,13 @@ int start(int argc, char** argv) {
             }
         });
 
-        for (auto* mod : g_modules) invoke_mod_function(mod, on_render, void, g_graphics);
+        for (auto* mod : g_modules) invoke_mod_function(mod, on_render, void); 
 
         ImGui::UseGraphicsContext(g_graphics);
         for (auto* mod : g_modules) {
+            if (!mod->is_loaded) continue;
             mod->set_imgui_context(ImGui::GetCurrentContext());
-            invoke_mod_function(mod, on_gui, void, g_graphics);
+            invoke_mod_function(mod, on_gui, void);
         }
         
         static f32 bar_width = (f32)windows->window_info[wnd].size.width;
@@ -868,7 +918,7 @@ int start(int argc, char** argv) {
         bar_height = ImGui::GetItemRectSize().y * 0.4f;
         if (toggle_play) {
             if (!g_is_playing) {
-                to_file(g_reg, g_ecs_dir);
+                to_file(g_reg, g_temp_ecs_dir);
                 
                 g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_begin = true;
@@ -881,7 +931,7 @@ int start(int argc, char** argv) {
                 deselect_all_entities();
 
                 g_reg.clear();
-                from_file(g_reg, g_ecs_dir);
+                from_file(g_reg, g_temp_ecs_dir);
 
                 for (auto n : selected_names) {
                     g_reg.view<Entity_Info>().each([n](entt::entity entity, Entity_Info& info) {
@@ -945,7 +995,6 @@ int start(int argc, char** argv) {
                 deselect_all_entities();
             }
         }, ImGuiWindowFlags_MenuBar);
-
         
         ImGui::DoGuiWindow(&entity_inspector, [&]() {
             for (auto selected_entity : g_selected_entities) {
@@ -956,22 +1005,34 @@ int start(int argc, char** argv) {
                         for (auto id : ids) {
                             if (void* comp = mod->get_component(id, g_reg, selected_entity)) {
                                 const auto& info = mod->get_component_info(id);
-                                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnDoubleClick;// | ImGuiTreeNodeFlags_Bullet;
+                                
+
+                                f32 header_pos_y = ImGui::GetCursorPosY();
+
+                                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow 
+                                                            | ImGuiTreeNodeFlags_DefaultOpen 
+                                                            | ImGuiTreeNodeFlags_OpenOnDoubleClick 
+                                                            //| ImGuiTreeNodeFlags_CollapsingHeader 
+                                                            | ImGuiTreeNodeFlags_NoAutoOpenOnLog
+                                                            | ImGuiTreeNodeFlags_AllowItemOverlap;
+
                                 bool component_opened = ImGui::TreeNodeEx(info->name.c_str(), flags);
-                                
-                                ImGui::SameLine(ImGui::GetWindowWidth() - 30);
-                                
-                                ImGui::PushID(comp);
-                                if (ImGui::IconButton(ICON_TYPE_OPTIONS, { 16, 16 })) {
-                                    
+
+                                if (ImGui::IsItemClicked(1)) {
                                     manage_component_popup.should_open = true;
-                                    manage_component_popup.done_fn = [mod, id, selected_entity]() {
-                                        if (strcmp(manage_component_popup.return_value, "Remove") == 0) {
+                                    manage_component_popup.fn = [mod, id, selected_entity, comp, info]() {
+                                        if (ImGui::MenuItem("Remove")) {
                                             mod->remove_component(id, g_reg, selected_entity);
                                         }
+                                        if (ImGui::MenuItem("Copy")) {
+                                            component_clipboard = { comp, id, mod };
+                                        }
+                                        if (ImGui::MenuItem("Paste", 0, false, id == component_clipboard.type && component_clipboard.mod == mod && component_clipboard.data)) {
+                                            memcpy(comp, component_clipboard.data, info->size);
+                                        }
+                                        
                                     };
                                 }
-                                ImGui::PopID();
 
                                 mod->set_imgui_context(ImGui::GetCurrentContext());
                                 if (component_opened) {
@@ -990,9 +1051,18 @@ int start(int argc, char** argv) {
                         }
                     }
 
-                    if (ImGui::MenuItem("Add Component")) {
+                    
+
+                    ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
+
+                    static f32 button_width = 100.f;
+
+                    ImGui::SetCursorPosX(ImGui::GetWindowContentRegionWidth() / 2.f - button_width / 2.f);
+
+                    if (ImGui::RButton("Add Component")) {
                         add_component_popup.should_open = true;
                     }
+                    button_width = ImGui::GetItemRectSize().x;
                 }
             }
             if (g_selected_entities.size() == 0) {
@@ -1001,7 +1071,119 @@ int start(int argc, char** argv) {
         });
 
         ImGui::DoGuiWindow(&style_editor, []() {
-            ImGui::ShowStyleEditor();
+            auto& style = ImGui::GetStyle();
+            auto& ext_style = ImGui::GetExtensionStyle();
+
+            ImGui::Text("Padding");
+            ImGui::RDragFloat2("Window padding", (float*)&style.WindowPadding, .05f);
+            ImGui::RDragFloat2("Frame padding", (float*)&style.FramePadding, .05f);
+            ImGui::RDragFloat2("Touch extra padding", (float*)&style.TouchExtraPadding, .05f);
+            ImGui::RDragFloat2("Display window padding", (float*)&style.DisplayWindowPadding, .05f);
+            ImGui::RDragFloat2("Display safe area padding", (float*)&style.DisplaySafeAreaPadding, .05f);
+            ImGui::RDragFloat2("Item padding", (float*)&style.ItemSpacing, .05f);
+            ImGui::RDragFloat2("Item inner padding", (float*)&style.ItemInnerSpacing, .05f);
+            ImGui::RDragFloat("Indent padding", &style.IndentSpacing, .05f);
+            ImGui::RDragFloat("Columns min padding", &style.ColumnsMinSpacing, .05f);
+            ImGui::RSliderFloat("Right align padding", &ext_style.right_align_padding, .01f, 1.f);
+            ImGui::RDragFloat2("Button min padding", ext_style.min_button_padding.ptr, .05f);
+
+            ImGui::Spacing();
+            ImGui::Text("Border toggles");
+            {
+                bool borders = style.WindowBorderSize > 0;
+                ImGui::RCheckbox("Window borders", &borders);
+                style.WindowBorderSize = (f32)borders;
+            }
+            {
+                bool borders = style.ChildBorderSize > 0;
+                ImGui::RCheckbox("Child borders", &borders);
+                style.ChildBorderSize = (f32)borders;
+            }
+            {
+                bool borders = style.PopupBorderSize > 0;
+                ImGui::RCheckbox("Popup borders", &borders);
+                style.PopupBorderSize = (f32)borders;
+            }
+            {
+                bool borders = style.TabBorderSize > 0;
+                ImGui::RCheckbox("Tab borders", &borders);
+                style.TabBorderSize = (f32)borders;
+            }
+
+            {
+                bool borders = style.FrameBorderSize > 0;
+                ImGui::RCheckbox("Frame borders", &borders);
+                style.FrameBorderSize = (f32)borders;
+            }
+
+            ImGui::Spacing();
+            ImGui::Text("Size");
+            ImGui::RDragFloat2("Window min size", (float*)&style.WindowMinSize, .05f, .1f, 20000.f);
+            ImGui::RDragFloat("Scrollbar size", &style.ScrollbarSize, .1f, .1f, 1000.f);
+            ImGui::RDragFloat("Grab min size", &style.GrabMinSize, .1f, .1f, 1000.f);
+            ImGui::RDragFloat("Tab min width for close button", &style.TabMinWidthForCloseButton);
+
+            ImGui::Spacing();
+            ImGui::Text("Rounding");
+            ImGui::RSliderFloat("Window rounding", &style.WindowRounding, .0f, 40.f);
+            ImGui::RSliderFloat("Child rounding", &style.ChildRounding, .0f, 40.f);
+            ImGui::RSliderFloat("Popup rounding", &style.PopupRounding, .0f, 40.f);
+            ImGui::RSliderFloat("Frame rounding", &style.FrameRounding, .0f, 40.f);
+            ImGui::RSliderFloat("Scrollbar rounding", &style.ScrollbarRounding, .0f, 40.f);
+            ImGui::RSliderFloat("Grab rounding", &style.GrabRounding, .0f, 40.f);
+            ImGui::RSliderFloat("Tab rounding", &style.TabRounding, .0f, 40.f);
+
+            ImGui::Spacing();
+            ImGui::Text("Alignment");
+            ImGui::RSliderFloat2("Window title align", (float*)&style.WindowTitleAlign, .0f, 1.f);
+            ImGui::RSliderFloat2("Button text align", (float*)&style.ButtonTextAlign, .0f, 1.f);
+            ImGui::RSliderFloat2("Selectable text align", (float*)&style.SelectableTextAlign, .0f, 1.f);
+
+            auto imgui_dir_str = [](ImGuiDir dir) {
+                switch (dir) {
+                    case ImGuiDir_Up:    return "Top";
+                    case ImGuiDir_Right: return "Right";
+                    case ImGuiDir_Down:  return "Bottom";
+                    case ImGuiDir_Left:  return "Left";
+                }
+                return "N/A";
+            };
+
+            if (ImGui::RBeginCombo("Window menu button align", imgui_dir_str(style.WindowMenuButtonPosition))) {
+                if (ImGui::Selectable("None", style.WindowMenuButtonPosition == ImGuiDir_None)) {
+                    style.WindowMenuButtonPosition = ImGuiDir_None;
+                }
+                if (ImGui::Selectable("Right", style.WindowMenuButtonPosition == ImGuiDir_Right)) {
+                    style.WindowMenuButtonPosition = ImGuiDir_Right;
+                }
+                if (ImGui::Selectable("Left", style.WindowMenuButtonPosition == ImGuiDir_Left)) {
+                    style.WindowMenuButtonPosition = ImGuiDir_Left;
+                }
+                ImGui::REndCombo();
+            }
+
+            if (ImGui::RBeginCombo("Color button align", imgui_dir_str(style.ColorButtonPosition))) {
+                if (ImGui::Selectable("Right", style.WindowMenuButtonPosition == ImGuiDir_Right)) {
+                    style.ColorButtonPosition = ImGuiDir_Right;
+                }
+                if (ImGui::Selectable("Left", style.WindowMenuButtonPosition == ImGuiDir_Left)) {
+                    style.ColorButtonPosition = ImGuiDir_Left;
+                }
+                ImGui::REndCombo();
+            }
+            ImGui::RSliderFloat("Right align", &ext_style.right_align_padding, .01f, 1.f);
+
+            ImGui::Spacing();
+            ImGui::Text("Rendering");
+            ImGui::RCheckbox("Anti-aliased lines", &style.AntiAliasedLines);
+            ImGui::RCheckbox("Anti-aliased lines use texture", &style.AntiAliasedLinesUseTex);
+            ImGui::RCheckbox("Anti-aliased fill", &style.AntiAliasedFill);
+
+            ImGui::Spacing();
+            ImGui::Text("Colors");
+            for (int i = 0; i < ImGuiCol_COUNT; i++) {
+                ImGui::RColorEdit4(ImGui::GetStyleColorName(i), (float*)&style.Colors[i]);
+            } 
         });
 
         for (auto* popup : gui_popups) {

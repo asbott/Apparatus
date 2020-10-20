@@ -69,7 +69,7 @@ workspace "apparatus"
     project "apparatus"
         kind "SharedLib"
         language   "C++"
-        warnings   "Extra"
+        warnings   "Default"
         cppdialect "C++17"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
@@ -104,7 +104,8 @@ workspace "apparatus"
             "deps/imgui",
             "deps/spdlog/include",
             "deps/stb_image",
-            "deps/entt/single_include"
+            "deps/entt/single_include",
+            "deps/entt/src"
         }
 
         pchheader "pch.h"
@@ -151,7 +152,10 @@ workspace "apparatus"
     
     make_module "test_module"
 
-    make_module "ecs_2d_renderer"
+    make_module "2d_viewport"
+    make_module "2d_editor"
+    make_module "2d_sprite_renderer"
+    make_module "2d_tilemap_renderer"
 
     make_module "asset_manager"
 
@@ -162,7 +166,7 @@ workspace "apparatus"
     project "launcher"
         kind "ConsoleApp"
         language   "C++"
-        warnings   "Extra"
+        warnings   "Default"
         cppdialect "C++17"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
@@ -194,7 +198,8 @@ workspace "apparatus"
             "deps/imgui",
             "deps/spdlog/include",
             "deps/stb_image",
-            "deps/entt/single_include"
+            "deps/entt/single_include",
+            "deps/entt/src"
         }
 
         filter "system:windows"
@@ -207,7 +212,7 @@ workspace "apparatus"
     project "parser"
         kind "ConsoleApp"
         language   "C++"
-        warnings   "Extra"
+        warnings   "Default"
         cppdialect "C++17"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")

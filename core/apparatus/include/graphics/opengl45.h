@@ -7,8 +7,8 @@
 struct OpenGL45 {
 
     struct Render_Target_Info {
-        graphics_id_t fbo;
-        graphics_id_t texture;
+        graphics_id_t fbo = G_NULL_ID;
+        graphics_id_t texture = G_NULL_ID;
         mz::ivec2 size;
     };
 
@@ -35,10 +35,10 @@ struct OpenGL45 {
     Dynamic_Array<Buffer_Layout_Specification> _uniform_buffer_layouts;
     Dynamic_Array<Render_Target_Info> _render_targets;
 
-    Graphics<OpenGL45>* _api;
+    Graphics<OpenGL45>* _api = NULL;
 
     Windows_Context _windows_context;
-    ImGuiContext* _imgui_context;
+    ImGuiContext* _imgui_context = NULL;
 };
 
 #endif // AP_SUPPORT_OPENGL45

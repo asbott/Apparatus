@@ -2,7 +2,8 @@
 
 #include <box2d/box2d.h>
 
-#include "ecs_2d_renderer/ecs_2d_renderer.h"
+#include "2d_sprite_renderer/2d_sprite_renderer.h"
+#include "2d_viewport/2d_viewport.h"
 
 #include "2d_physics.h"
 
@@ -156,22 +157,16 @@ void update_sim_body(entt::entity entity, PhysicsBody2D& body, Transform2D& tran
 }
 
 extern "C" {
-    _export void __cdecl on_load(Graphics_Context* graphics) {
-        log_info("on_load called in test_module!");
-        (void)graphics;
-
-        windows = graphics->get_windows_context();
-        wnd = windows->main_window_handle;
-
+    _export void __cdecl on_load() {
         simulation_thread = get_thread_server().make_thread();
 
         should_apply_transforms.store(false);
     }
 
-    _export void __cdecl on_unload(Graphics_Context* graphics) {
-        (void)graphics;
-
+    _export void __cdecl on_unload() {
         get_thread_server().kill_thread(simulation_thread);
+
+        if (g_world) delete g_world;
     }
 
     
@@ -277,15 +272,16 @@ extern "C" {
     _export void __cdecl on_play_stop() {
         get_thread_server().wait_for_thread(simulation_thread);
         delete g_world;
+        g_world = NULL;
         should_apply_transforms.store(false);
     }
 
-    _export void __cdecl on_render(Graphics_Context* graphics) {
-        (void)graphics;
+    _export void __cdecl on_render() {
+        
         
     }
 
-    _export void __cdecl on_gui(Graphics_Context* graphics) {
-        (void)graphics;
+    _export void __cdecl on_gui() {
+        
     }
 }

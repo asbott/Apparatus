@@ -7,6 +7,8 @@
 #include "graphics/directx11.h"
 #include "graphics/opengl45.h"
 
+#include "render_context.h"
+
 #include "input_codes.h"
 
 #include "thread_server.h"
@@ -16,4 +18,4 @@
 using namespace mz;
 
 #define _export __declspec(dllexport)
-#define tag(...)
+#define tag(...) 

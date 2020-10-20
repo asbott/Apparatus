@@ -6,6 +6,8 @@
 
 #include "input_codes.h"
 
+#include "archive.h"
+
 ImGuiExtensionStyle g_ext_style;
 
 
@@ -200,6 +202,118 @@ namespace ImGui {
         return ret;
     }
 
+    bool RSliderFloat(const char* label, float* v, float v_min, float v_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v);
+        bool ret = SliderFloat("", v, v_min, v_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+    bool RSliderFloat2(const char* label, float v[2], float v_min, float v_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v);
+        bool ret = SliderFloat2("", v, v_min, v_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+    bool RSliderFloat3(const char* label, float v[3], float v_min, float v_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v);
+        bool ret = SliderFloat3("", v, v_min, v_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+    bool RSliderFloat4(const char* label, float v[4], float v_min, float v_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v);
+        bool ret = SliderFloat4("", v, v_min, v_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+    bool RSliderAngle(const char* label, float* v_rad, float v_degrees_min, float v_degrees_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v_rad);
+        bool ret = SliderAngle("", v_rad, v_degrees_min, v_degrees_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+    bool RSliderInt(const char* label, int* v, int v_min, int v_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v);
+        bool ret = SliderInt("", v, v_min, v_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+    bool RSliderInt2(const char* label, int v[2], int v_min, int v_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v);
+        bool ret = SliderInt2("", v, v_min, v_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+    bool RSliderInt3(const char* label, int v[3], int v_min, int v_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v);
+        bool ret = SliderInt3("", v, v_min, v_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+    bool RSliderInt4(const char* label, int v[4], int v_min, int v_max, const char* format, ImGuiSliderFlags flags) {
+        set_layout(label);
+        PushID(v);
+        bool ret = SliderInt4("", v, v_min, v_max, format, flags);
+        PopID();
+        return ret;
+    }
+
+
+    bool RButton(str_ptr_t label) {
+        auto& p = GetExtensionStyle().min_button_padding;
+        PushStyleVar(ImGuiStyleVar_FramePadding, { p.x, p.y });
+
+        bool pressed = Button(label);
+
+        PopStyleVar();
+
+        return pressed;
+    }
+
+    bool RSection(str_ptr_t label) {
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow 
+                                | ImGuiTreeNodeFlags_DefaultOpen 
+                                | ImGuiTreeNodeFlags_OpenOnDoubleClick 
+                                | ImGuiTreeNodeFlags_Framed 
+                                /*| ImGuiTreeNodeFlags_NoIndentOnOpen*/ 
+                                | ImGuiTreeNodeFlags_NoAutoOpenOnLog
+                                | ImGuiTreeNodeFlags_AllowItemOverlap
+                                | ImGuiTreeNodeFlags_SpanAvailWidth;
+    
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { ImGui::GetStyle().ItemSpacing.x, 0 });
+
+    f32 border = ImGui::GetStyle().FrameBorderSize;
+    SetCursorPosX(-border * 2.f);
+    SetNextItemWidth(GetWindowContentRegionWidth() + border * 2.f * 2.f);
+
+    bool open = ImGui::TreeNodeEx(label, flags);;
+
+    ImGui::PopStyleVar();
+    ImGui::PopStyleVar();
+
+    return open;
+}
+
+
+
+
     bool RCheckbox(const char* label, bool* v) {
         set_layout(label);
         PushID(v);
@@ -254,43 +368,25 @@ namespace ImGui {
     }
 
     void SaveStyleToDisk(str_ptr_t path) {
-        std::ofstream ostr;
-        ostr.open(path);
-        if (!ostr.good()) return;
+        Binary_Archive archive(path);
 
-        byte* style_data = (byte*)&ImGui::GetStyle();
+        archive.write<ImGuiStyle>("imgui_style", ImGui::GetStyle());
+        archive.write<ImGuiExtensionStyle>("imgui_ext_style", ImGui::GetExtensionStyle());
 
-        for (int i = 0; i < sizeof(ImGuiStyle); i++) {
-            ostr << (int)style_data[i] << " ";
-        }
-
-        ostr.close();
+        archive.flush();
     }
     void LoadStyleFromDisk(str_ptr_t path) {
-        if (!Path::can_open(path)) return;
-        std::ifstream istr;
-        istr.open(path);
+        Binary_Archive archive(path);
 
-        byte* style_data = (byte*)&ImGui::GetStyle();
-
-        Dynamic_Array<byte> bytes;
-
-        while (!istr.eof()) {
-            str_t<4> byte_str = "";
-
-            istr >> byte_str;
-
-            bool is_num = true;
-            for (int i = 0; i < strlen(byte_str); i++) if (!isdigit(byte_str[i]) ) is_num = false;
-
-            if (!is_num) continue;
-
-            bytes.push_back((byte)atoi(byte_str));
+        if (archive.is_valid_id("imgui_style")) {
+            ImGuiStyle& loaded_style = archive.read<ImGuiStyle>("imgui_style");
+            memcpy(&ImGui::GetStyle(), &loaded_style, sizeof(ImGuiStyle));
         }
-
-        memcpy(style_data, bytes.data(), bytes.size());
-
-        istr.close();
+            
+        if (archive.is_valid_id("imgui_ext_style")) {
+            ImGuiExtensionStyle& loaded_style = archive.read<ImGuiExtensionStyle>("imgui_ext_style");
+            memcpy(&ImGui::GetExtensionStyle(), &loaded_style, sizeof(ImGuiExtensionStyle));
+        }
     }
     
 }

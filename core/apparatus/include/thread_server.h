@@ -1,7 +1,7 @@
 #pragma once
 
 typedef u32 thread_id_t;
-constexpr thread_id_t NULL_THREAD = (thread_id_t)0 - (thread_id_t)1;
+constexpr thread_id_t NULL_THREAD = UINT32_MAX;
 
 typedef std::function<void()> Thread_Task;
 
@@ -12,7 +12,7 @@ struct Thread_Context {
 		pause.store(src.pause.load());
 		kill.store(src.kill.load());
 	}
-	AP_API Thread_Context(Thread_Context&& src) {
+	AP_API Thread_Context(Thread_Context&& src) noexcept {
 		task_queue = std::move(src.task_queue);
 		pause.store(src.pause.load());
 		kill.store(src.kill.load());

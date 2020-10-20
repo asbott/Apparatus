@@ -29,6 +29,12 @@ typedef u32 graphics_id_t;
 constexpr graphics_id_t G_NULL_ID = std::numeric_limits<graphics_id_t>::max();
 
 struct Input_State {
+    Input_State() {
+        memset(keys_down, 0, sizeof(keys_down));
+        memset(keys_press, 0, sizeof(keys_press));
+        memset(mouse_down, 0, sizeof(mouse_down));
+        memset(mouse_press, 0, sizeof(mouse_press));
+    }
 	bool keys_down[AP_KEY_COUNT];
 	bool keys_press[AP_KEY_COUNT];
 
@@ -60,7 +66,7 @@ struct Window_Info {
     const char* title;
     f64 delta_time = 0;
     f64 _last_time = 0;
-    bool is_vsync_on;
+    bool is_vsync_on = false;
     Input_State _input;
 
     std::mutex _input_mutex;
@@ -171,6 +177,7 @@ struct AP_API Graphics_Context {
 
     virtual void set_culling(graphics_enum_t value) = 0;
     virtual void set_blending(bool value) = 0;
+    virtual void set_depth_testing(bool value) = 0;
 
     virtual graphics_id_t make_vertex_array(const Buffer_Layout_Specification& layout) = 0;
     virtual graphics_id_t make_shader_source(graphics_enum_t source_type, const char* src) = 0;
@@ -265,6 +272,9 @@ struct AP_API Graphics : public Graphics_Context {
     }
     _ap_force_inline void set_blending(bool value) override {
         _thread_server->queue_task(_tid, [this, value]() { _inst.set_blending(value); });
+    }
+    _ap_force_inline void set_depth_testing(bool value) override {
+        _thread_server->queue_task(_tid, [this, value]() { _inst.set_depth_testing(value); });
     }
 
     _ap_force_inline graphics_id_t make_vertex_array(const Buffer_Layout_Specification& layout) override {
@@ -484,13 +494,14 @@ struct AP_API Graphics : public Graphics_Context {
 
     api_t _inst;
     Thread_Server* _thread_server = NULL;
-    thread_id_t _tid;
+    thread_id_t _tid = NULL_THREAD;
     bool _should_delete_thread_server = false;
 };
 
 #define _impl_api \
 void set_culling(graphics_enum_t value);\
 void set_blending(bool value);\
+void set_depth_testing(bool value);\
 graphics_id_t make_vertex_array(const Buffer_Layout_Specification& layout);\
 graphics_id_t make_shader_source(graphics_enum_t source_type, const char* src);\
 graphics_id_t make_shader(graphics_id_t vert_shader, graphics_id_t frag_shader, const Buffer_Layout_Specification& input_layout);\

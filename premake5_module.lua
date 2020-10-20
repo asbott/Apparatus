@@ -1,6 +1,6 @@
 kind "SharedLib"
 language   "C++"
-warnings   "Extra"
+warnings   "Default"
 cppdialect "C++17"
 targetdir  ("lib/%{prj.name}")
 objdir     ("lib/%{prj.name}-int")
@@ -37,6 +37,7 @@ includedirs {
     "deps/spdlog/include",
     "deps/stb_image",
     "deps/entt/single_include",
+    "deps/entt/src",
     "deps/box2d/include",
     "deps",
     "%{wks.location}/",

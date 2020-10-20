@@ -5,6 +5,7 @@
 #include <functional>
 
 #include <misc/cpp/imgui_stdlib.h>
+#include <asset_manager/asset_manager.h>
 
 Hash_Set<uintptr_t> runtime_ids;
 Hash_Map<std::string, uintptr_t> name_id_map;
@@ -62,6 +63,7 @@ extern "C" {
                 "PhysicsBody2D",
                 id,
                 true,
+                sizeof(PhysicsBody2D),
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data) {
@@ -141,6 +143,7 @@ extern "C" {
                 "CollisionShape2D",
                 id,
                 true,
+                sizeof(CollisionShape2D),
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data) {

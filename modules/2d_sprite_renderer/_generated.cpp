@@ -1,10 +1,11 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/ecs_2d_renderer/ecs_2d_renderer.h"
+#include "D:/dev/Apparatus/modules/2d_sprite_renderer/2d_sprite_renderer.h"
 
 #include <vector>
 #include <functional>
 
 #include <misc/cpp/imgui_stdlib.h>
+#include <asset_manager/asset_manager.h>
 
 Hash_Set<uintptr_t> runtime_ids;
 Hash_Map<std::string, uintptr_t> name_id_map;
@@ -44,53 +45,6 @@ extern "C" {
 	__declspec(dllexport) void __cdecl init() {
 
         {
-            uintptr_t id = (uintptr_t)typeid(Transform2D).name();
-            runtime_ids.emplace(id);
-            name_id_map["Transform2D"] = id;
-            component_info[id] = {
-                [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<Transform2D>(entity);
-                },
-                [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<Transform2D>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<Transform2D>(entity);
-                }, 
-                [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<Transform2D>(entity);
-                },
-            
-                "Transform2D",
-                id,
-                false,
-                std::vector<Property_Info> {
-                    Property_Info { 
-                        [](void* data) {
-                            do_gui<fvec2>("position", (fvec2*)data);
-                        },
-                        "position",
-                        sizeof(fvec2),
-                        0,
-                    },
-                    Property_Info { 
-                        [](void* data) {
-                            do_gui<f32>("rotation", (f32*)data);
-                        },
-                        "rotation",
-                        sizeof(f32),
-                        sizeof(fvec2),
-                    },
-                    Property_Info { 
-                        [](void* data) {
-                            do_gui<fvec2>("scale", (fvec2*)data);
-                        },
-                        "scale",
-                        sizeof(fvec2),
-                        sizeof(fvec2)+sizeof(f32),
-                    },
-                }
-            };
-        }
-        {
             uintptr_t id = (uintptr_t)typeid(Sprite2D).name();
             runtime_ids.emplace(id);
             name_id_map["Sprite2D"] = id;
@@ -109,28 +63,11 @@ extern "C" {
                 "Sprite2D",
                 id,
                 false,
+                sizeof(Sprite2D),
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data) {
-                            (void)data;
-                            Asset_Request_View view_request;
-                            view_request.asset_id = *(asset_id_t*)data;
-                            Asset* asset_view = get_module("asset_manager")->request<Asset*>(view_request);
-                            char na[] = "<none>";
-                            if (asset_view) ImGui::RInputText("texture", asset_view->file_name, strlen(asset_view->file_name));
-                            else ImGui::RInputText("texture", na, strlen(na));
-                            if (ImGui::BeginDragDropTarget()) {
-                                auto* p = ImGui::AcceptDragDropPayload("asset");
-                                if (p) {
-                                    auto payload = (Gui_Payload*)p->Data;
-                                    auto new_id = (asset_id_t)(uintptr_t)payload->value;
-                                    view_request.asset_id = new_id;
-                                    asset_view = get_module("asset_manager")->request<Asset*>(view_request);
-                                    if (asset_view && asset_view->asset_type == ASSET_TYPE_TEXTURE) memcpy(data, &new_id, sizeof(asset_id_t));
-                                }
-                            ImGui::EndDragDropTarget();
-                            }
-                        },
+                            ImGui::InputAsset("texture", (asset_id_t*)data, "Texture");                        },
                         "texture",
                         sizeof(asset_id_t),
                         0,
@@ -151,36 +88,52 @@ extern "C" {
                         sizeof(fvec2),
                         sizeof(asset_id_t)+sizeof(color),
                     },
+                    Property_Info { 
+                        [](void* data) {
+                            do_gui<int>("depth_level", (int*)data);
+                        },
+                        "depth_level",
+                        sizeof(int),
+                        sizeof(asset_id_t)+sizeof(color)+sizeof(fvec2),
+                    },
                 }
             };
         }
         {
-            uintptr_t id = (uintptr_t)typeid(View2D).name();
+            uintptr_t id = (uintptr_t)typeid(SpriteAnimation2D).name();
             runtime_ids.emplace(id);
-            name_id_map["View2D"] = id;
+            name_id_map["SpriteAnimation2D"] = id;
             component_info[id] = {
                 [](entt::registry& reg, entt::entity entity) { 
-                    return &reg.emplace<View2D>(entity);
+                    return &reg.emplace<SpriteAnimation2D>(entity);
                 },
                 [](entt::registry& reg, entt::entity entity) { 
-                    if (!reg.has<View2D>(entity)) return (void*)NULL;
-                    return (void*)&reg.get<View2D>(entity);
+                    if (!reg.has<SpriteAnimation2D>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<SpriteAnimation2D>(entity);
                 }, 
                 [](entt::registry& reg, entt::entity entity) { 
-                    reg.remove<View2D>(entity);
+                    reg.remove<SpriteAnimation2D>(entity);
                 },
             
-                "View2D",
+                "SpriteAnimation2D",
                 id,
                 false,
+                sizeof(SpriteAnimation2D),
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data) {
-                            ImGui::RColorEdit4("clear_color", (f32*)data);
+                            do_gui<bool>("use_asset", (bool*)data);
                         },
-                        "clear_color",
-                        sizeof(color16),
+                        "use_asset",
+                        sizeof(bool),
                         0,
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            ImGui::InputAsset("anim_asset", (asset_id_t*)data, "2");                        },
+                        "anim_asset",
+                        sizeof(asset_id_t),
+                        sizeof(bool),
                     },
                 }
             };
