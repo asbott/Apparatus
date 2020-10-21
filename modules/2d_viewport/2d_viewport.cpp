@@ -244,8 +244,8 @@ void do_viewport_gui() {
 	}, flags);
 }
 
-extern "C" {
-	_export void __cdecl on_load() {
+module_scope {
+	module_function(void) on_load() {
 		register_gui_window(&g_viewport);
 
 		auto graphics = get_graphics();
@@ -253,7 +253,7 @@ extern "C" {
 		graphics->set_blending(true);
 	}
 
-	_export void __cdecl on_unload() {
+	module_function(void) on_unload() {
 		Graphics_Context* graphics = get_graphics();
 		for (graphics_id_t render_target : g_render_targets_to_destroy) {
 			graphics->destroy_render_target(render_target);
@@ -263,7 +263,7 @@ extern "C" {
 		unregister_gui_window(&g_viewport);
 	}
 
-	_export void __cdecl on_play_begin() {
+	module_function(void) on_play_begin() {
 		auto& reg = get_entity_registry();
 		if (!is_valid_camera(reg, g_selected_camera))  {
 			const auto& view = reg.view<View2D, Transform2D>();
@@ -288,7 +288,7 @@ extern "C" {
 		}
 	}
 
-	_export void __cdecl on_play_stop() {
+	module_function(void) on_play_stop() {
 		Graphics_Context* graphics = get_graphics();
 		for (graphics_id_t render_target : g_render_targets_to_destroy) {
 			graphics->destroy_render_target(render_target);
@@ -314,12 +314,12 @@ extern "C" {
 		}
 	}
 
-	_export void __cdecl on_update(float delta) {
+	module_function(void) on_update(float delta) {
 		(void)delta;
 		
 	}
 
-	_export void __cdecl on_render() {
+	module_function(void) on_render() {
 
 		auto& reg = get_entity_registry();
 		auto graphics = get_graphics();
@@ -341,7 +341,7 @@ extern "C" {
 		});
 	}
 
-	_export void __cdecl on_gui() {
+	module_function(void) on_gui() {
 		do_viewport_gui();
 	}
 }

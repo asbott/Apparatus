@@ -3,6 +3,10 @@
 #include <iostream>
 #include <ostream>
 
+#include <entt/meta/meta.hpp>
+#include <entt/meta/ctx.hpp>
+#include <entt/meta/resolve.hpp>
+
 #include "start.h"
 
 #include "dependencies.h"
@@ -89,6 +93,8 @@ path_str_t g_project_dir = "";
 path_str_t g_browse_dir = "";
 File_Browser_Mode g_browse_mode;
 
+Dynamic_Array<std::function<void()>> g_deferred_functions;
+
 namespace ImGui {
 	void Icon(Icon_Type icon, mz::ivec2 size) {
         auto native = g_graphics->get_native_texture_handle(icons[icon]);
@@ -121,7 +127,7 @@ entt::registry& get_entity_registry() {
     return g_reg;
 }
 
-Module* get_module(name_str_t str_id) {
+Module* get_module(str_ptr_t str_id) {
     for (auto* mod : g_modules) {
         if (strcmp(mod->str_id, str_id) == 0) return mod;
     }
@@ -172,12 +178,12 @@ thread_id_t get_graphics_thread() {
     return g_graphics_thread;
 }
 
-void register_module(name_str_t mod_name) {
+void register_module(str_ptr_t mod_name) {
 
     path_str_t mod_path = "";
     path_str_t mod_path_new = "";
-    sprintf(mod_path, "%s/../runtime/%s_used.dll", get_executable_directory(), mod_name);
-    sprintf(mod_path_new, "%s/../runtime/%s.dll", get_executable_directory(), mod_name);
+    sprintf(mod_path, "%s/../runtime/%s_used." MODULE_FILE_EXTENSION, get_executable_directory(), mod_name);
+    sprintf(mod_path_new, "%s/../runtime/%s." MODULE_FILE_EXTENSION, get_executable_directory(), mod_name);
 
     auto err = Path::copy(mod_path_new, mod_path);
     ap_assert(err.value() == 0, "Copy fail: {}", err.message());
@@ -224,6 +230,10 @@ bool is_playing() {
     return g_is_playing;
 }
 
+void defer(std::function<void()> fn) {
+    g_deferred_functions.push_back(fn);
+}
+
 void to_file(entt::registry& reg, str_ptr_t dir_path) {
 
     auto res = Path::remove(dir_path);
@@ -246,7 +256,7 @@ void to_file(entt::registry& reg, str_ptr_t dir_path) {
                 sprintf(comp_file_path, "%s/%s.%s", dir_path, entity_info.name, info->name.c_str());
 
                 str_t<sizeof("component_") + 1> id = "";
-                sprintf(id, "component_%llu", ncomponents);
+                sprintf(id, "component_%lu", ncomponents);
                 entity_archive.write(id, comp_file_path);
 
                 Binary_Archive comp_archive(comp_file_path);
@@ -277,15 +287,13 @@ void from_file(entt::registry& reg, str_ptr_t dir_path) {
             entity_info.id = entity;
 
             Binary_Archive entity_archive(entry);
-
             if (!entity_archive.is_valid_id("ncomponents")) return;
 
             size_t ncomponents = entity_archive.read<size_t>("ncomponents");
 
             for (size_t i = 0; i < ncomponents; i++) {
                 str_t<sizeof("component_") + 1> id = "";
-                sprintf(id, "component_%llu", i + 1);
-
+                sprintf(id, "component_%lu", i + 1);
                 if (entity_archive.is_valid_id(id)) {
                     str_ptr_t comp_path = entity_archive.read<path_str_t>(id);
 
@@ -325,6 +333,8 @@ void from_file(entt::registry& reg, str_ptr_t dir_path) {
     }, false);
 }
 
+#ifdef _OS_WINDOWS
+
 s32 filter(u32 code, _EXCEPTION_POINTERS *ep, str_ptr_t mod_name, str_ptr_t mod_fn) {
     (void)ep; (void)mod_name; (void)mod_fn;
     str_ptr_t descr = "";
@@ -358,12 +368,6 @@ s32 filter(u32 code, _EXCEPTION_POINTERS *ep, str_ptr_t mod_name, str_ptr_t mod_
         descr, code, (uintptr_t)ep->ExceptionRecord->ExceptionAddress, mod_name, mod_fn);
     return EXCEPTION_EXECUTE_HANDLER;
 }
-
-template <typename ...T>
-void __ignore(T && ...)
-{ }
-
-#define invoke_mod_function(mod, fn, ret_t, ...) if (mod->fn) _invoke_mod_function<ret_t>(mod->fn, mod->str_id, #fn, __VA_ARGS__)
 template <typename ret_t, typename fn_t, typename ...arg_t>
 ret_t _invoke_mod_function(fn_t fn, str_ptr_t mod_name, str_ptr_t fn_name, arg_t&... args) {
     __try {
@@ -376,6 +380,16 @@ ret_t _invoke_mod_function(fn_t fn, str_ptr_t mod_name, str_ptr_t fn_name, arg_t
         }
     }
 }
+
+#else
+template <typename ret_t, typename fn_t, typename ...arg_t>
+ret_t _invoke_mod_function(fn_t fn, str_ptr_t mod_name, str_ptr_t fn_name, arg_t&... args) {
+    return fn(args...);
+}
+#endif
+
+#define invoke_mod_function(mod, fn, ret_t) if (mod->fn) _invoke_mod_function<ret_t>(mod->fn, mod->str_id, #fn)
+#define invoke_mod_function_args(mod, fn, ret_t, ...) if (mod->fn) _invoke_mod_function<ret_t>(mod->fn, mod->str_id, #fn, __VA_ARGS__)
 
 void save_user_settings(str_ptr_t dir) {
     path_str_t user_file = "";
@@ -467,7 +481,7 @@ void do_file_browser_gui() {
 
     #endif
 
-    ImGui::Text(g_browse_dir);
+    ImGui::Text("%s", g_browse_dir);
 
     ImGui::BeginChildFrame(1, { ImGui::GetWindowSize().x, ImGui::GetWindowSize().y * 0.65f }, ImGuiWindowFlags_MenuBar);
 
@@ -570,12 +584,15 @@ bool load_module(Module* mod) {
     mod->init();
 
     invoke_mod_function(mod, on_load, void);
+    for (auto& deferred_fn : g_deferred_functions) deferred_fn();
+    g_deferred_functions.clear();
 
     return true;
 }
 
 bool unload_module(Module* mod) {
     invoke_mod_function(mod, on_unload, void);
+    deselect_all_entities();
     if (mod->is_loaded) {
         for (auto comp_id : mod->get_component_ids()) {
             g_reg.each([mod, comp_id](entt::entity entity) {
@@ -584,6 +601,7 @@ bool unload_module(Module* mod) {
                 }
             });
         }
+        //mod->deinit();
     }
     if (!mod->unload()) return false;
     return true;
@@ -595,7 +613,10 @@ bool reload_module(Module* mod) {
 
 void save_project() {
     if (is_playing()) return;
-    for (auto mod : g_modules) invoke_mod_function(mod, save_to_disk, void, g_project_dir);
+    for (auto mod : g_modules) invoke_mod_function_args(mod, save_to_disk, void, g_project_dir);
+    for (auto& deferred_fn : g_deferred_functions) deferred_fn();
+    g_deferred_functions.clear();
+
     to_file(g_reg, g_ecs_dir);
     save_user_settings(g_user_dir);
     ImGui::SaveStyleToDisk(g_style_path);
@@ -607,12 +628,15 @@ void load_project(str_ptr_t new_dir) {
     sprintf(g_ecs_dir, "%s/ecs", new_dir);
     sprintf(g_temp_dir, "%s/.temp", new_dir);
     sprintf(g_temp_ecs_dir, "%s/ecs", g_temp_dir);
+
     g_reg.clear();
     deselect_all_entities();
     for (auto mod : g_modules) if (mod->is_loaded) reload_module(mod); else load_module(mod);
     from_file(g_reg, g_ecs_dir);
 
-    for (auto mod : g_modules) invoke_mod_function(mod, load_from_disk, void, g_project_dir);
+    for (auto mod : g_modules) invoke_mod_function_args(mod, load_from_disk, void, g_project_dir);
+    for (auto& deferred_fn : g_deferred_functions) deferred_fn();
+    g_deferred_functions.clear();
 
     load_user_settings(g_user_dir);
     ImGui::LoadStyleFromDisk(g_style_path);
@@ -730,13 +754,11 @@ int start(int argc, char** argv) {
 
     register_module("2d_sprite_renderer");
     register_module("2d_tilemap_renderer");
-
     register_module("2d_particles_simulator");
 
     register_module("2d_physics");
-    
-    register_module("test_module");
 
+    register_module("test_module");
 
     ImGui::GetIO().Fonts->AddFontDefault();
 
@@ -792,7 +814,9 @@ int start(int argc, char** argv) {
 
         
         if (g_is_playing) {
-            for (auto* mod : g_modules) invoke_mod_function(mod, on_update, void, delta);
+            for (auto* mod : g_modules) invoke_mod_function_args(mod, on_update, void, delta);
+            for (auto& deferred_fn : g_deferred_functions) deferred_fn();
+            g_deferred_functions.clear();
         }
 
         if (windows->should_close(wnd)) {
@@ -834,7 +858,7 @@ int start(int argc, char** argv) {
 
                 if (selected_module->is_loaded) {
                     ImGui::Spacing();
-                    ImGui::Text("Number of components: %i", selected_module->get_component_ids().size());
+                    ImGui::Text("Number of components: %lu", selected_module->get_component_ids().size());
                 }
 
                 ImGui::Spacing();
@@ -856,6 +880,8 @@ int start(int argc, char** argv) {
         });
 
         for (auto* mod : g_modules) invoke_mod_function(mod, on_render, void); 
+        for (auto& deferred_fn : g_deferred_functions) deferred_fn();
+        g_deferred_functions.clear();
 
         ImGui::UseGraphicsContext(g_graphics);
         for (auto* mod : g_modules) {
@@ -863,6 +889,8 @@ int start(int argc, char** argv) {
             mod->set_imgui_context(ImGui::GetCurrentContext());
             invoke_mod_function(mod, on_gui, void);
         }
+        for (auto& deferred_fn : g_deferred_functions) deferred_fn();
+        g_deferred_functions.clear();   
         
         static f32 bar_width = (f32)windows->window_info[wnd].size.width;
         static f32 bar_height = 32.f;
@@ -923,6 +951,8 @@ int start(int argc, char** argv) {
                 g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_begin = true;
             } else {
+
+                g_thread_server.wait_for_thread(g_graphics_thread);
                 
                 static Dynamic_Array<str_ptr_t> selected_names;
                 for (auto& selected_entity : get_selected_entities()) {
@@ -930,7 +960,9 @@ int start(int argc, char** argv) {
                 }
                 deselect_all_entities();
 
-                g_reg.clear();
+                g_reg.each([](entt::entity entity) {
+                    g_reg.destroy(entity);
+                });
                 from_file(g_reg, g_temp_ecs_dir);
 
                 for (auto n : selected_names) {
@@ -941,8 +973,6 @@ int start(int argc, char** argv) {
                     });
                 }
                 selected_names.clear();
-
-                g_thread_server.wait_for_thread(g_graphics_thread);
                 want_invoke_on_play_stop = true;
             }
 
@@ -1206,10 +1236,14 @@ int start(int argc, char** argv) {
         if (want_invoke_on_play_begin) {
             save_user_settings(g_user_dir);
             for (auto* mod : g_modules) invoke_mod_function(mod, on_play_begin, void);
+            for (auto& deferred_fn : g_deferred_functions) deferred_fn();
+            g_deferred_functions.clear();   
         }
         if (want_invoke_on_play_stop) {
             for (auto* mod : g_modules) invoke_mod_function(mod, on_play_stop, void);
             load_user_settings(g_user_dir);
+            for (auto& deferred_fn : g_deferred_functions) deferred_fn();
+            g_deferred_functions.clear();   
         }
 
         // Swap the buffers in swap chain
@@ -1217,8 +1251,15 @@ int start(int argc, char** argv) {
         
         update_dependencies();
 
+        if (to_reload.size() > 0) {
+            to_file(g_reg, g_temp_ecs_dir);
+            g_reg.clear();
+        };
         for (auto* mod : to_reload) {
             reload_module(mod);
+        }
+        if (to_reload.size() > 0) {
+            from_file(g_reg, g_temp_ecs_dir);
         }
         to_reload.clear();
 

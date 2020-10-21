@@ -4,9 +4,9 @@
 #include "texture_asset.h"
 #include "sprite_animation_asset_2d.h"
 
-#include "modules/2d_physics/2d_physics.h"
+#include "2d_physics/2d_physics.h"
 
-#include "modules/asset_manager/asset_manager.h"
+#include "asset_manager/asset_manager.h"
 
 #include "2d_viewport/2d_viewport.h"
 #include "2d_editor/2d_editor.h"
@@ -144,7 +144,6 @@ void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& 
 				get_thread_server().wait_for_thread(get_graphics_thread());
 				graphics->set_vertex_buffer_data(context.vbo, context.data, 0, vertex_count * sizeof(Vertex));
 
-				graphics->clear(G_COLOR_BUFFER_BIT, render_target);
 				graphics->draw_indices(context.vao, context.shader, index_count, context.ubo, G_DRAW_MODE_TRIANGLES, render_target);
 
 				context.data_ptr = context.data;
@@ -218,8 +217,8 @@ void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& 
 	}
 }
 
-extern "C" {
-	_export void __cdecl on_load() {
+module_scope {
+	module_function(void) on_load() {
 		Graphics_Context* graphics = get_graphics();
 
 		g_asset_module = get_module("asset_manager");
@@ -287,38 +286,38 @@ extern "C" {
 		
 	}
 
-	_export void __cdecl on_unload() {
+	module_function(void) on_unload() {
 		
 	}
 
-	_export void __cdecl on_play_begin() {
+	module_function(void) on_play_begin() {
 		
 	}
 
-	_export void __cdecl on_play_stop() {
+	module_function(void) on_play_stop() {
 		
 	}
 
-	_export void __cdecl save_to_disk(str_ptr_t dir) {
+	module_function(void) save_to_disk(str_ptr_t dir) {
 		(void)dir;
         
     }
 
-    _export void __cdecl load_from_disk(str_ptr_t dir) {
+    module_function(void) load_from_disk(str_ptr_t dir) {
 		(void)dir;
 		
 	}
 
-	_export void __cdecl on_update(float delta) {
+	module_function(void) on_update(float delta) {
 		(void)delta;
 
 		
 	}
 
-	_export void __cdecl on_render() {
+	module_function(void) on_render() {
 		Graphics_Context* graphics = get_graphics();
 
-		if (!g_asset_manager) {
+		if (!g_asset_manager || (uintptr_t)g_asset_manager != (uintptr_t)g_asset_module->get_function_library()) {
 			g_asset_manager = (Asset_Manager_Function_Library*)g_asset_module->get_function_library();
 		}
 
@@ -343,11 +342,7 @@ extern "C" {
 		}
 	}
 
-	_export void __cdecl on_gui() {
+	module_function(void) on_gui() {
 		
-	}
-
-	_export void* __cdecl _request(void* preq) {
-		return NULL;
 	}
 }

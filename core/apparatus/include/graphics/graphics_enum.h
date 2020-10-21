@@ -238,7 +238,7 @@ inline graphics_enum_t compile_time_type_to_graphics_type() {
     else if constexpr (std::is_same<T, mz::fmat4>()) return G_DATA_TYPE_F32MAT4;
 
     else {
-        static_assert(false, "unhandled type in 'compile_time_type_to_graphics_type<>()'");
+        assert(false && "Unhandled type to size");
     }
 }
 

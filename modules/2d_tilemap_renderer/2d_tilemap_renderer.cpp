@@ -75,8 +75,8 @@ bool is_valid_tilemap_entity(entt::registry& reg, entt::entity entity) {
     return reg.valid(entity) && reg.has<TileMap2D>(entity);
 }
 
-extern "C" {
-	_export void __cdecl on_load() {
+module_scope {
+	module_function(void) on_load() {
 		
         auto graphics = get_graphics();
 
@@ -113,7 +113,7 @@ extern "C" {
         g_asset_functions = (Asset_Manager_Function_Library*)g_asset_module->get_function_library();
 	}
 
-    _export void __cdecl on_unload() {
+    module_function(void) on_unload() {
         Graphics_Context* graphics = get_graphics();
 		for (graphics_id_t render_target : g_render_targets_to_destroy) {
 			graphics->destroy_render_target(render_target);
@@ -123,7 +123,7 @@ extern "C" {
 		unregister_gui_window(&g_tilemap_editor);
     }
 
-	_export void __cdecl on_play_begin() {
+	module_function(void) on_play_begin() {
 		Graphics_Context* graphics = get_graphics();
 		for (graphics_id_t render_target : g_render_targets_to_destroy) {
 			graphics->destroy_render_target(render_target);
@@ -131,25 +131,25 @@ extern "C" {
 		g_render_targets_to_destroy.clear();
 	}
 
-	_export void __cdecl on_play_end() {
+	module_function(void) on_play_end() {
 		
 	}
 
-    _export void __cdecl save_to_disk(str_ptr_t dir) {
+    module_function(void) save_to_disk(str_ptr_t dir) {
 		
 	}
 
-	_export void __cdecl load_from_disk(str_ptr_t dir) {
+	module_function(void) load_from_disk(str_ptr_t dir) {
 		
 	}
 
-    _export void __cdecl on_update(float delta) {
+    module_function(void) on_update(float delta) {
 		(void)delta;
 
 		
     }
 
-	_export void __cdecl on_render() {
+	module_function(void) on_render() {
 		
         auto& reg = get_entity_registry();
 
@@ -186,7 +186,7 @@ extern "C" {
 
 	}
 
-	_export void __cdecl on_gui() {
+	module_function(void) on_gui() {
 		
         auto& reg = get_entity_registry();
         auto graphics = get_graphics();

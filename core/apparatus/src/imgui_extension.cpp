@@ -17,9 +17,9 @@ namespace ImGui {
     void set_layout(str_ptr_t label) {
         f32 right_offset = GetWindowWidth() * g_ext_style.right_align;
         AlignTextToFramePadding();
-        Text(label); 
+        Text("%s", label); 
         if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(label);
+            ImGui::SetTooltip("%s", label);
         }
         auto wnd = ImGui::GetCurrentWindow();
         if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
@@ -35,21 +35,21 @@ namespace ImGui {
     bool RInputText(const char* label, char* buf, size_t buf_size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
         str_t<128> id = "";
-        sprintf(id, "##%llu", (uintptr_t)buf);
+        sprintf(id, "##%lu", (u64)buf);
         bool ret = InputText(id, buf, buf_size, flags, callback, user_data);
         return ret;
     }
     bool RInputTextMultiline(const char* label, char* buf, size_t buf_size, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
         str_t<128> id = "";
-        sprintf(id, "##%llu", (uintptr_t)buf);
+        sprintf(id, "##%lu", (u64)buf);
         bool ret = InputTextMultiline(id, buf, buf_size, size, flags, callback, user_data);
         return ret;
     }
     bool RInputTextWithHint(const char* label, const char* hint, char* buf, size_t buf_size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
         str_t<128> id = "";
-        sprintf(id, "##%llu", (uintptr_t)buf);
+        sprintf(id, "##%lu", (u64)buf);
         bool ret = InputTextWithHint(id, hint, buf, buf_size, flags, callback, user_data);
         return ret;
     }
@@ -325,7 +325,7 @@ namespace ImGui {
     bool RBeginCombo(const char* label, const char* preview_value, ImGuiComboFlags flags) {
         set_layout(label);
         str_t<22> id = "";
-        sprintf(id, "##%llu", (u64)preview_value + (u64)label);
+        sprintf(id, "##%lu", (u64)preview_value + (u64)label);
         bool ret = BeginCombo(id, preview_value, flags);
         return ret;
     }

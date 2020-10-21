@@ -1,9 +1,11 @@
 #include <iostream>
-#include <windows.h>
 #include <filesystem>
 #include <fstream>
 #include <set>
 #include <string>
+#include <ostream>
+
+#include <vector>
 
 #include "io.h"
 
@@ -469,6 +471,9 @@ int main(int argc, char** argv) {
 #include <vector>
 #include <functional>
 
+#include <entt/meta/meta.hpp>
+#include <entt/meta/resolve.hpp>
+
 #include <misc/cpp/imgui_stdlib.h>
 #include <asset_manager/asset_manager.h>
 
@@ -504,43 +509,43 @@ void do_gui(const std::string& name, type_t* data) {
     }
 }
 
-extern "C" {
+module_scope {
 
     // Generated
-	__declspec(dllexport) void __cdecl init() {
+	module_function(void) init() {
 
 )"; constexpr char lower_code[] = R"(
     
     }
 
-    __declspec(dllexport) Component_Info* __cdecl get_component_info(uintptr_t runtime_id) {
+    module_function(Component_Info*) get_component_info(uintptr_t runtime_id) {
 		return &component_info[runtime_id];
 	}
 
-	__declspec(dllexport) const Hash_Set<uintptr_t>& __cdecl get_component_ids() {
+	module_function(const Hash_Set<uintptr_t>&)get_component_ids() {
 		return runtime_ids;
 	}
 
-	__declspec(dllexport) void* __cdecl create_component(uintptr_t runtime_id, entt::registry& reg, entt::entity entity) {
+	module_function(void*) create_component(uintptr_t runtime_id, entt::registry& reg, entt::entity entity) {
 		return component_info[runtime_id].create(reg, entity);
 	}
 
-    __declspec(dllexport) void* __cdecl get_component(uintptr_t runtime_id, entt::registry& reg, entt::entity entity) {
+    module_function(void*) get_component(uintptr_t runtime_id, entt::registry& reg, entt::entity entity) {
         return component_info[runtime_id].get(reg, entity);
     }
 
-    __declspec(dllexport) void __cdecl remove_component(uintptr_t runtime_id, entt::registry& reg, entt::entity entity) {
+    module_function(void) remove_component(uintptr_t runtime_id, entt::registry& reg, entt::entity entity) {
 		component_info[runtime_id].remove(reg, entity);
 	}
 
-    __declspec(dllexport) uintptr_t __cdecl get_component_id(const std::string& name) {
+    module_function(uintptr_t) get_component_id(const std::string& name) {
         if (name_id_map.find(name) != name_id_map.end())
             return name_id_map[name];
         else
             return 0;
     }
 
-    __declspec(dllexport) void __cdecl set_imgui_context(ImGuiContext* ctx) {
+    module_function(void) set_imgui_context(ImGuiContext* ctx) {
         ImGui::SetCurrentContext(ctx);
     }
 
@@ -758,6 +763,18 @@ extern "C" {
     }
 
     output_stream << lower_code;
+
+    output_stream << "module_scope {\n    module_function(void) deinit() {\n";
+
+    for (auto& struct_item : structs) {
+        for (auto& tag : struct_item.tags) {
+            if (tag.str == "component") {
+                output_stream << "        entt::resolve<" << struct_item.name << ">().reset();\n";
+            }
+        }
+    }
+
+    output_stream << "    }\n}\n";
 
 	done(0);
 }

@@ -22,7 +22,7 @@ protected:
     void sink_it_(const spdlog::details::log_msg& msg) override
     {
         spdlog::memory_buf_t formatted;
-        base_sink<Mutex>::formatter_->format(msg, formatted);
+        spdlog::sinks::base_sink<Mutex>::formatter_->format(msg, formatted);
         ctx->entries.push_back({ fmt::to_string(formatted), msg.level });
         ctx->has_new = true;
     }
@@ -63,7 +63,7 @@ void Log_Context::do_gui(Gui_Window* wnd) {
         }
         for (auto& entry : entries) {
             if (filter_flags[entry.level]) {
-                ImGui::TextColored(filter_colors[entry.level], entry.dynamic_str.c_str());
+                ImGui::TextColored(filter_colors[entry.level], "%s", entry.dynamic_str.c_str());
             }
         }
         if (has_new) {

@@ -4,8 +4,6 @@
 
 #include "asset_manager.h"
 
-#include "pfd/portable-file-dialogs.h"
-
 struct Asset_Directory {
     Asset_Directory(Asset_Directory* parent, str_ptr_t path) 
         : parent_directory(parent) {
@@ -397,8 +395,8 @@ Asset_Loader* get_loader(str_ptr_t ext) {
     return NULL;
 }
 
-extern "C" {
-    _export void __cdecl on_load() {
+module_scope {
+    module_function(void) on_load() {
         srand((u32)time(NULL));
 
         Graphics_Context* graphics = get_graphics();
@@ -422,7 +420,7 @@ extern "C" {
         register_gui_popup(&g_manager_menu_popup);
     }
 
-    _export void __cdecl save_to_disk(str_ptr_t dir) {
+    module_function(void) save_to_disk(str_ptr_t dir) {
         (void)dir;
 
         sprintf(g_assets_dir, "%s/assets", dir);
@@ -451,7 +449,7 @@ extern "C" {
 
     }
 
-    _export void __cdecl load_from_disk(str_ptr_t dir) {
+    module_function(void) load_from_disk(str_ptr_t dir) {
         
         clear_assets();
 
@@ -527,7 +525,7 @@ extern "C" {
         });
     }
 
-    _export void __cdecl on_unload() {
+    module_function(void) on_unload() {
         clear_assets();
         if (g_root_directory) delete g_root_directory;
 
@@ -537,13 +535,13 @@ extern "C" {
         unregister_gui_popup(&g_manager_menu_popup);
     }
 
-    _export void __cdecl on_update(float delta) {
+    module_function(void) on_update(float delta) {
         (void)delta;
 
 
     }
 
-    _export void __cdecl on_render() {
+    module_function(void) on_render() {
         
     }
 
@@ -642,7 +640,7 @@ extern "C" {
         depth++;
     }
 
-    _export void __cdecl on_gui() {
+    module_function(void) on_gui() {
         ImGui::DoGuiWindow(&g_asset_manager, [&]() {
 
             ImGui::BeginMenuBar();
@@ -676,7 +674,7 @@ extern "C" {
         });
     }
 
-    _export void* __cdecl get_function_library() {
+    module_function(void*) get_function_library() {
 
         static Asset_Manager_Function_Library lib;
 

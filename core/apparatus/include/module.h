@@ -5,6 +5,10 @@ struct ImGuiContext;
 
 #include "os.h"
 
+#ifndef _OS_WINDOWS
+    #define __cdecl 
+#endif
+
 struct Module {
 
     typedef void (__cdecl *on_load_t)(); 
@@ -20,6 +24,7 @@ struct Module {
     typedef void (__cdecl *load_from_disk_t)(str_ptr_t);
 
     typedef void (__cdecl *init_t)(); 
+    typedef void (__cdecl *deinit_t)(); 
     typedef Component_Info* (__cdecl *get_component_info_t)(uintptr_t); 
     typedef const Hash_Set<uintptr_t>& (__cdecl *get_component_ids_t)(); 
     typedef void* (__cdecl *create_component_t)(uintptr_t, entt::registry&, entt::entity); 
@@ -44,6 +49,7 @@ struct Module {
     load_from_disk_t load_from_disk = NULL;
 
     init_t init = NULL;
+    deinit_t deinit = NULL;
     get_component_info_t get_component_info = NULL;
     get_component_ids_t  get_component_ids  = NULL;
     create_component_t   create_component   = NULL;
@@ -57,7 +63,7 @@ struct Module {
 
     get_function_library_t get_function_library;
 
-    Module(path_str_t mod_path, path_str_t mod_path_new, name_str_t str_id = "unnamed");
+    Module(str_ptr_t mod_path, str_ptr_t mod_path_new, str_ptr_t str_id = "unnamed");
 
     inline bool has_component(uintptr_t comp_id, entt::registry& reg, entt::entity entity) {
         return this->get_component(comp_id, reg, entity) != NULL;

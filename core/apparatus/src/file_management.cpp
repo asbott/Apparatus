@@ -1,5 +1,3 @@
-#pragma once
-
 #include "pch.h"
 
 #include "file_management.h"
@@ -13,7 +11,6 @@ typedef FILE* File_Handle;
 namespace Path {
     bool read_all_bytes(str_ptr_t path, byte* out_buffer, size_t buffer_size) {
         File_Handle file_handle = fopen(path, "r");
-        
         if (!file_handle) return false;
 
         fread(out_buffer, buffer_size, 1, file_handle);

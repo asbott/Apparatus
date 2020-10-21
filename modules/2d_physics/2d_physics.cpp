@@ -156,14 +156,14 @@ void update_sim_body(entt::entity entity, PhysicsBody2D& body, Transform2D& tran
     };
 }
 
-extern "C" {
-    _export void __cdecl on_load() {
+module_scope {
+    module_function(void) on_load() {
         simulation_thread = get_thread_server().make_thread();
 
         should_apply_transforms.store(false);
     }
 
-    _export void __cdecl on_unload() {
+    module_function(void) on_unload() {
         get_thread_server().kill_thread(simulation_thread);
 
         if (g_world) delete g_world;
@@ -171,7 +171,7 @@ extern "C" {
 
     
 
-    _export void __cdecl on_play_begin() {
+    module_function(void) on_play_begin() {
         g_world = new b2World(b2Vec2(0, 0));
         g_world->SetContactListener(&contact_listener);
         auto& reg = get_entity_registry();
@@ -200,7 +200,7 @@ extern "C" {
         g_world->Step(1.f / tick_rate, velocity_iterations, position_iterations);
     }	
 
-    _export void __cdecl on_update(float delta) {
+    module_function(void) on_update(float delta) {
         (void)delta;
         time_waited += delta;
         auto& reg = get_entity_registry();
@@ -269,19 +269,19 @@ extern "C" {
         }
     }
 
-    _export void __cdecl on_play_stop() {
+    module_function(void) on_play_stop() {
         get_thread_server().wait_for_thread(simulation_thread);
         delete g_world;
         g_world = NULL;
         should_apply_transforms.store(false);
     }
 
-    _export void __cdecl on_render() {
+    module_function(void) on_render() {
         
         
     }
 
-    _export void __cdecl on_gui() {
+    module_function(void) on_gui() {
         
     }
 }

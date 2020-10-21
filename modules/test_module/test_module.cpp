@@ -6,25 +6,25 @@
 #include "2d_physics/2d_physics.h"
 #include "2d_viewport/2d_viewport.h"
 
-extern "C" {
+module_scope {
 
-	_export void __cdecl on_load() {
+	module_function(void) on_load() {
 		
 	}
 
-    _export void __cdecl on_unload() {
+    module_function(void) on_unload() {
 		
     }
 
-	_export void __cdecl on_play_begin() {
+	module_function(void) on_play_begin() {
 		
 	}
 
-	_export void __cdecl on_play_end() {
+	module_function(void) on_play_end() {
 		
 	}
 
-    _export void __cdecl on_update(float delta) {
+    module_function(void) on_update(float delta) {
 		(void)delta;
 
 		auto& reg = get_entity_registry();
@@ -59,11 +59,11 @@ extern "C" {
 		});
     }
 
-	_export void __cdecl on_render() {
+	module_function(void) on_render() {
 		
 	}
 
-	_export void __cdecl on_gui() {
+	module_function(void) on_gui() {
 		
 	}
 }

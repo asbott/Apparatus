@@ -161,7 +161,7 @@ void main()
 		gizmo_render_context.set_buffers(graphics, gizmo_layout, indices, ubo_layout);
 	}
 
-	inline void add_line(mz::fvec2 a, mz::fvec2 b, mz::color color = COLOR_WHITE) {
+	inline void add_line(mz::fvec2 a, mz::fvec2 b, mz::color color = mz::COLOR_WHITE) {
 		if (!enable) return;
 		Gizmo_Line line;
 		line.a = a;
@@ -169,7 +169,7 @@ void main()
 		line.color = color;
 		lines.push_back(line);
 	}
-	inline void add_wire_circle(mz::fvec2 pos, f32 radius, const mz::color& color = COLOR_WHITE) {
+	inline void add_wire_circle(mz::fvec2 pos, f32 radius, const mz::color& color = mz::COLOR_WHITE) {
 		if (!enable) return;
 		Gizmo_Circle circle;
 		circle.color = color;
@@ -178,7 +178,7 @@ void main()
 		circle.radius = radius;
 		circles.push_back(circle);
 	}
-	inline void add_filled_circle(mz::fvec2 pos, f32 radius, const mz::color& color = COLOR_WHITE, mz::color fill_color = mz::color(.3f, .3f, .3f, .5f)) {
+	inline void add_filled_circle(mz::fvec2 pos, f32 radius, const mz::color& color = mz::COLOR_WHITE, mz::color fill_color = mz::color(.3f, .3f, .3f, .5f)) {
 		if (!enable) return;
 		Gizmo_Circle circle;
 		circle.color = color;
@@ -188,7 +188,7 @@ void main()
 		circle.radius = radius;
 		circles.push_back(circle);
 	}
-	inline void add_wire_quad(const mz::fquad& quad, const mz::color& color = COLOR_WHITE) {
+	inline void add_wire_quad(const mz::fquad& quad, const mz::color& color = mz::COLOR_WHITE) {
 		if (!enable) return;
 		Gizmo_Quad gizmo_quad;
 		gizmo_quad.color = color;
@@ -196,7 +196,7 @@ void main()
 		gizmo_quad.quad = quad;
 		quads.push_back(gizmo_quad);
 	}
-	inline void add_filled_quad(const mz::fquad& quad, const mz::color& color = COLOR_WHITE, mz::color fill_color = mz::color(.3f, .3f, .3f, .5f)) {
+	inline void add_filled_quad(const mz::fquad& quad, const mz::color& color = mz::COLOR_WHITE, mz::color fill_color = mz::color(.3f, .3f, .3f, .5f)) {
 		if (!enable) return;
 		Gizmo_Quad gizmo_quad;
 		gizmo_quad.color = color;
@@ -212,7 +212,7 @@ void main()
 		quads.clear();
 	}
 
-	inline void flush() {
+	inline void flush(const mz::fmat4& cam_transform, graphics_id_t render_target) {
 		if (!enable) return;
 
 		auto graphics = get_graphics();
@@ -220,14 +220,10 @@ void main()
 		gizmo_render_context.data_ptr = gizmo_render_context.data;
 		u32 index_count = 0;
 		u32 vertex_count = 0;
-
-		mz::fmat4 cam_transform = g_editor_cam.transform;
-		cam_transform.rows[2].w = -.5f;
-		cam_transform.invert();
-		cam_transform = g_editor_cam.ortho * cam_transform;
+		
 		graphics->set_uniform_buffer_data(gizmo_render_context.ubo, "cam_transform", cam_transform.ptr);
 
-		for (auto& line : gizmo_list.lines) {
+		for (auto& line : lines) {
 			gizmo_render_context.data_ptr->pos = line.a;
 			gizmo_render_context.data_ptr->color = line.color;
 			gizmo_render_context.data_ptr++;
@@ -240,7 +236,7 @@ void main()
 			vertex_count += 2;
 		}
 
-		for (auto& quad : gizmo_list.quads) {
+		for (auto& quad : quads) {
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[0];
 			gizmo_render_context.data_ptr->pos.z = 999999;
 			gizmo_render_context.data_ptr->color = quad.color;
@@ -279,7 +275,7 @@ void main()
 			vertex_count += 8;
 		}
 
-		for (auto& circle : gizmo_list.circles) {
+		for (auto& circle : circles) {
 			constexpr s32 r = 100;
 			for(s32 ii = 0; ii < r; ii++)
 			{
@@ -310,10 +306,10 @@ void main()
 			get_thread_server().wait_for_thread(get_graphics_thread());
 			graphics->set_vertex_buffer_data(gizmo_render_context.vbo, gizmo_render_context.data, 0, vertex_count * sizeof(Gizmo_Vertex));
 
-			graphics->draw_indices(gizmo_render_context.vao, gizmo_render_context.shader, index_count, gizmo_render_context.ubo, G_DRAW_MODE_LINES, g_editor_cam.render_target);
+			graphics->draw_indices(gizmo_render_context.vao, gizmo_render_context.shader, index_count, gizmo_render_context.ubo, G_DRAW_MODE_LINES, render_target);
 		}
 
-		gizmo_list.clear();
+		clear();
 	}
 
 	Dynamic_Array<Gizmo_Line> lines;

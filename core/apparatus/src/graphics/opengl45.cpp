@@ -3,9 +3,9 @@
 #ifdef AP_SUPPORT_OPENGL45
 
 #include <glad/glad.h>
-#include <gl/GLU.h>
+#include <GL/glu.h>
 
-#include <glfw/glfw3.h>
+#include <GLFW/glfw3.h>
 
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_glfw.h>
@@ -964,14 +964,14 @@ void OpenGL45::associate_index_buffer(graphics_id_t ibo, graphics_id_t vao) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void OpenGL45::set_vertex_buffer_data(graphics_id_t vbo, void* data, size_t offset, size_t sz) {
+void OpenGL45::set_vertex_buffer_data(graphics_id_t vbo, const void* data, size_t offset, size_t sz) {
     make_context_current();
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)sz, data);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
-void OpenGL45::set_index_buffer_data(graphics_id_t ibo, u32* indices, count_t offset, count_t count) {
+void OpenGL45::set_index_buffer_data(graphics_id_t ibo, const u32* indices, count_t offset, count_t count) {
     make_context_current();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
     glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)(offset * sizeof(u32)), (GLsizeiptr)(count * sizeof(u32)), indices);
@@ -979,7 +979,7 @@ void OpenGL45::set_index_buffer_data(graphics_id_t ibo, u32* indices, count_t of
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void OpenGL45::set_uniform_buffer_data(graphics_id_t ubo, const char* name, void* data) {
+void OpenGL45::set_uniform_buffer_data(graphics_id_t ubo, const char* name, const void* data) {
     make_context_current();
 
     auto& layout = _uniform_buffer_layouts[ubo];

@@ -185,8 +185,8 @@ void render_points(Graphics_Context* graphics, Points_Context& context, u64 npar
 	}
 }
 
-extern "C" {
-	_export void __cdecl on_load() {
+module_scope {
+	module_function(void) on_load() {
         g_editor_module = get_module("2d_editor");
 
         Graphics_Context* graphics = get_graphics();
@@ -237,11 +237,11 @@ extern "C" {
 
 	}
 
-    _export void __cdecl on_unload() {
+    module_function(void) on_unload() {
 		
     }
 
-	_export void __cdecl on_play_begin() {
+	module_function(void) on_play_begin() {
         auto& reg = get_entity_registry();
 		reg.view<ParticleSimulation2D, Transform2D>().each([](ParticleSimulation2D& sim, Transform2D&) {
             sim.state.reset();
@@ -249,15 +249,15 @@ extern "C" {
         });
 	}
 
-	_export void __cdecl on_play_end() {
+	module_function(void) on_play_end() {
 		
 	}
 
-    _export void __cdecl on_update(float delta) {
+    module_function(void) on_update(float delta) {
 		(void)delta;
     }
 
-	_export void __cdecl on_render() {
+	module_function(void) on_render() {
         Graphics_Context* graphics = get_graphics();
         auto windows = graphics->get_windows_context();
         auto wnd = windows->main_window_handle;
@@ -306,7 +306,7 @@ extern "C" {
 	}
 
 
-	_export void __cdecl on_gui() {
+	module_function(void) on_gui() {
 		
 	}
 }

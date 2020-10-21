@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef _OS_WINDOWS
+
 #define NOMINMAX
 #include <Windows.h>
 #include <fstream>
@@ -58,6 +60,42 @@ operator<<(std::basic_ostream<_Elem,_Traits>& i, color& c)
     SetConsoleTextAttribute(hStdout,c.m_color);
     return i;
 }
+
+#elif defined(_OS_LINUX)
+inline std::ostream& blue(std::ostream &s)
+{
+    return s;
+}
+
+inline std::ostream& red(std::ostream &s)
+{
+    return s;
+}
+
+inline std::ostream& green(std::ostream &s)
+{
+    return s;
+}
+
+inline std::ostream& yellow(std::ostream &s)
+{
+    return s;
+}
+
+inline std::ostream& white(std::ostream &s)
+{
+    return s;
+}
+
+struct color {};
+
+template <class _Elem, class _Traits>
+std::basic_ostream<_Elem,_Traits>& 
+operator<<(std::basic_ostream<_Elem,_Traits>& i, color& c)
+{
+    return i;
+}
+#endif
 
 inline bool read_as_string(const char* path, char* out_buffer, size_t buffer_size) {
     FILE* file_handle = fopen(path, "r");

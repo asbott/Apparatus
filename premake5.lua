@@ -14,6 +14,13 @@ workspace "apparatus"
 
     startproject "launcher"
 
+    filter "system:windows"
+        defines { "_OS_WINDOWS" }
+
+    filter "system:linux"
+        pic "On"
+        defines { "_OS_LINUX" }
+
 
     filter "system:windows"
         exceptionhandling "SEH"
@@ -40,7 +47,7 @@ workspace "apparatus"
         defines {"_CONFIG_DEBUG", "_AP_ENABLE_GL_DEBUG_CONTEXT"}
         runtime "Debug"
         symbols "On"
-        floatingpoint "Strict"
+        floatingpoint "Default"
 
     filter "configurations:Test*"
         defines  "_CONFIG_TEST"
@@ -75,7 +82,7 @@ workspace "apparatus"
         objdir     ("lib/%{prj.name}-int")
         vectorextensions "SSE4.1"
         location "core/apparatus"
-
+        staticruntime "on"
 
         flags {
             "FatalWarnings",
@@ -111,15 +118,7 @@ workspace "apparatus"
         pchheader "pch.h"
         pchsource "%{prj.location}/src/pch.cpp"
 
-        disablewarnings {
-            "4324"
-        }
-
-        postbuildcommands {
-            "if not exist %{wks.location}lib\\runtime\\ mkdir %{wks.location}lib\\runtime\\",
-            "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\launcher\\%{prj.name}.dll",
-            "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\runtime\\%{prj.name}.dll"
-        }
+        
 
         filter "system:windows"
             defines { "_OS_WINDOWS" }
@@ -130,6 +129,12 @@ workspace "apparatus"
                 "gdi32",
                 "d3d11",
                 "D3DCompiler"
+            }
+            
+            postbuildcommands {
+                "if not exist %{wks.location}lib\\runtime\\ mkdir %{wks.location}lib\\runtime\\",
+                "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\launcher\\%{prj.name}.dll",
+                "copy %{wks.location}lib\\%{prj.name}\\%{prj.name}.dll %{wks.location}lib\\runtime\\%{prj.name}.dll"
             }
 
         filter "system:linux"
@@ -147,6 +152,13 @@ workspace "apparatus"
                 "Xi",
                 "dl",
                 "stdc++fs",
+            }
+
+            postbuildcommands {
+                "mkdir -p %{wks.location}lib/runtime/",
+                "mkdir -p %{wks.location}lib/launcher/",
+                "cp %{wks.location}/lib/%{prj.name}/lib%{prj.name}.so %{wks.location}/lib/launcher/%{prj.name}.so",
+                "cp %{wks.location}/lib/%{prj.name}/lib%{prj.name}.so %{wks.location}/lib/runtime/%{prj.name}.so"
             }
 
     
@@ -172,7 +184,7 @@ workspace "apparatus"
         objdir     ("lib/%{prj.name}-int")
         vectorextensions "SSE4.1"
         location "core/launcher"
-
+        staticruntime "on"
 
         flags {
             "FatalWarnings",
@@ -218,6 +230,9 @@ workspace "apparatus"
         objdir     ("lib/%{prj.name}-int")
         files { "%{prj.location}/**.cpp", "%{prj.location}/**.h" }
         location "core/parser"
+        staticruntime "on"
+        filter "system:linux"
+            pic "on"
 
     project "glfw"
         toolset    "gcc"
@@ -227,6 +242,9 @@ workspace "apparatus"
         warnings   "Off"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
+        staticruntime "on"
+        filter "system:linux"
+            pic "on"
 
         files {
             "deps/glfw/include/glfw/glfw3.h",
@@ -285,6 +303,9 @@ workspace "apparatus"
         warnings   "Off"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
+        staticruntime "on"
+        filter "system:linux"
+            pic "on"
 
         files {
             "deps/glad/include/glad/glad.h",
@@ -304,6 +325,9 @@ workspace "apparatus"
         warnings   "Off"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
+        staticruntime "on"
+        filter "system:linux"
+            pic "on"
 
         files
         {
@@ -319,7 +343,6 @@ workspace "apparatus"
             "deps/imgui/imgui_demo.cpp",
             "deps/imgui/backends/imgui_impl_opengl3.cpp",
             "deps/imgui/backends/imgui_impl_glfw.cpp",
-            "deps/imgui/backends/imgui_impl_dx11.cpp",
             "deps/imgui/misc/cpp/imgui_stdlib.cpp"
         }
         
@@ -332,6 +355,9 @@ workspace "apparatus"
         
         defines "IMGUI_IMPL_OPENGL_LOADER_GLAD"
 
+        filter "system:windows"
+            files { "deps/imgui/backends/imgui_impl_dx11.cpp" }
+
     project "box2d"
         location   "deps/box2d"
         kind       "StaticLib"
@@ -339,6 +365,7 @@ workspace "apparatus"
         warnings   "Off"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
+        staticruntime "on"
 
         files
         {
@@ -351,6 +378,9 @@ workspace "apparatus"
         }
 
         defines { "B2_API" }
+
+        filter "system:linux"
+            pic "on"
 
     
 

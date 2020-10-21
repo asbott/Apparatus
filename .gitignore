@@ -17,3 +17,8 @@ lib
 *.temp
 
 *.smproj
+
+*Makefile
+*.makefile
+
+all

@@ -219,9 +219,9 @@ struct AP_API Graphics_Context {
     virtual void associate_vertex_buffer(graphics_id_t vbo, graphics_id_t vao) = 0;
     virtual void associate_index_buffer(graphics_id_t ibo, graphics_id_t vao) = 0;
 
-    virtual void set_vertex_buffer_data(graphics_id_t vbo, void* data, size_t offset, size_t sz) = 0;
-    virtual void set_index_buffer_data(graphics_id_t ibo, u32* indices, count_t offset, count_t count) = 0;
-    virtual void set_uniform_buffer_data(graphics_id_t ubo, const char* name, void* data) = 0;
+    virtual void set_vertex_buffer_data(graphics_id_t vbo, const void* data, size_t offset, size_t sz) = 0;
+    virtual void set_index_buffer_data(graphics_id_t ibo, const u32* indices, count_t offset, count_t count) = 0;
+    virtual void set_uniform_buffer_data(graphics_id_t ubo, const char* name, const void* data) = 0;
 
     virtual void* map_vertex_buffer_data(graphics_id_t vbo)  = 0;
     virtual u32* map_index_buffer_data(graphics_id_t ibo)   = 0;
@@ -382,7 +382,7 @@ struct AP_API Graphics : public Graphics_Context {
         return ret;
     }
 
-    _ap_force_inline void set_render_target_size(graphics_id_t render_target, mz::ivec2 size) {
+    _ap_force_inline void set_render_target_size(graphics_id_t render_target, mz::ivec2 size) override {
         _thread_server->queue_task(_tid, [this, render_target, size]() { _inst.set_render_target_size(render_target, size); });
     }
     _ap_force_inline mz::ivec2 get_render_target_size(graphics_id_t render_target) override {
@@ -422,14 +422,14 @@ struct AP_API Graphics : public Graphics_Context {
         _thread_server->queue_task(_tid, [this, ibo, vao]() { _inst.associate_index_buffer(ibo, vao); });
     }
 
-    _ap_force_inline void set_vertex_buffer_data(graphics_id_t vbo, void* data, size_t offset, size_t sz) override {
+    _ap_force_inline void set_vertex_buffer_data(graphics_id_t vbo, const void* data, size_t offset, size_t sz) override {
         _thread_server->queue_task(_tid, [this, vbo, data, offset, sz]() { _inst.set_vertex_buffer_data(vbo, data, offset, sz); });
     }
 
-    _ap_force_inline void set_index_buffer_data(graphics_id_t ibo, u32* indices, count_t offset, count_t count) override {
+    _ap_force_inline void set_index_buffer_data(graphics_id_t ibo, const u32* indices, count_t offset, count_t count) override {
         _thread_server->queue_task(_tid, [this, ibo, indices, offset, count]() { _inst.set_index_buffer_data(ibo, indices, offset, count); });
     }
-    _ap_force_inline void set_uniform_buffer_data(graphics_id_t ubo, const char* name, void* data) override {
+    _ap_force_inline void set_uniform_buffer_data(graphics_id_t ubo, const char* name, const void* data) override {
         _thread_server->queue_task(_tid, [this, ubo, name, data]() { _inst.set_uniform_buffer_data(ubo, name, data); });
     }
 
@@ -533,9 +533,9 @@ void clear(graphics_enum_t clear_flags, graphics_id_t render_target);\
 void draw_indices(graphics_id_t vao, graphics_id_t shader, u32 index_count, graphics_id_t ubo, graphics_enum_t draw_mode, graphics_id_t render_target);\
 void associate_vertex_buffer(graphics_id_t vbo, graphics_id_t vao);\
 void associate_index_buffer(graphics_id_t ibo, graphics_id_t vao);\
-void set_vertex_buffer_data(graphics_id_t vbo, void* data, size_t offset, size_t sz);\
-void set_index_buffer_data(graphics_id_t ibo, u32* indices, count_t offset, count_t count);\
-void set_uniform_buffer_data(graphics_id_t ubo, const char* name, void* data);\
+void set_vertex_buffer_data(graphics_id_t vbo, const void* data, size_t offset, size_t sz);\
+void set_index_buffer_data(graphics_id_t ibo, const u32* indices, count_t offset, count_t count);\
+void set_uniform_buffer_data(graphics_id_t ubo, const char* name, const void* data);\
 void* map_vertex_buffer_data(graphics_id_t vbo)  ;\
 u32* map_index_buffer_data(graphics_id_t ibo)   ;\
 void* map_uniform_buffer_data(graphics_id_t ubo) ;\

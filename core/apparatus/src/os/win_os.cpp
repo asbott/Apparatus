@@ -47,12 +47,12 @@
 namespace fs = std::filesystem;
 
 namespace os {
-	module_t load_module(path_str_t path) {
+	module_t load_module(str_ptr_t path) {
 		fs::path p(path);
 		std::wstring wpath = p.wstring();
 		return (void*)LoadLibraryEx(wpath.c_str(), NULL, LOAD_IGNORE_CODE_AUTHZ_LEVEL);
 	}
-	void* load_module_function(module_t mod, str_t<> name_of_function) {
+	void* load_module_function(module_t mod, str_ptr_tname_of_function) {
 		HMODULE lib = (HMODULE)mod;
 		return (void*)GetProcAddress(lib, name_of_function);
 	}

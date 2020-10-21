@@ -5,9 +5,9 @@ programming.
 # Building
 After cloning the repo, make sure all git modules are initialized and updated:
 `git submodule update --init`
-<br>Then simply generate project files with premake5. From the repo directory, run: `premake5.exe vs2019` (windows).
+<br>Then simply generate project files with premake5. From the repo directory, run: `premake5.exe vs2019` on windows or `./premake5 gmake2` on unix (replace `vs2019` and `gmake2` with whatever project manager you want).
 
-I haven't built with anything except visual studio in a while, so it's likely that it won't compile with anything else. Definitely won't compile on any other os than windows right now.
+Apparatus should be fully functional on Linux systems using x11. Has been tested with Manjaro 20.1.2, compiling with g++ 10.2.0.
 
 # Showcase
 Runtime management of entites/components (entt backend)

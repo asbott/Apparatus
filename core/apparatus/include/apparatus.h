@@ -17,5 +17,12 @@
 
 using namespace mz;
 
-#define _export __declspec(dllexport)
+#ifdef _OS_WINDOWS
+    #define module_function(ret) extern "C" __declspec(dllexport) ret __cdecl
+    #define module_scope namespace
+#elif defined(_OS_LINUX)
+    #define module_function(ret) extern "C" ret
+    #define module_scope namespace 
+#endif
+
 #define tag(...) 

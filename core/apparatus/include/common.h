@@ -97,10 +97,14 @@
 
 #define NOMINMAX
 
-#ifdef AP_EXPORT
-	#define AP_API __declspec(dllexport)
+#ifdef _OS_WINDOWS
+	#ifdef AP_EXPORT
+		#define AP_API __declspec(dllexport)
+	#else
+		#define AP_API __declspec(dllimport)
+	#endif
 #else
-	#define AP_API __declspec(dllimport)
+	#define AP_API 
 #endif
 
 #define stringify(x) #x
@@ -108,9 +112,15 @@
 #ifdef _CONFIG_DEBUG
 	#define debug_only(x) x
 #else
-	#define debug_only(x) x
+	#define debug_only(x)
 #endif
 
 #define AP_NS_BEGIN(x) namespace x {
 
 #define AP_NS_END(x) }
+
+#ifdef _OS_WINDOWS
+	#define MODULE_FILE_EXTENSION "dll"
+#elif defined(_OS_LINUX)
+	#define MODULE_FILE_EXTENSION "so"
+#endif

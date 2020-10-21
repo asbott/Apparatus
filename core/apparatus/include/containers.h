@@ -188,7 +188,7 @@ struct Static_Array {
         size_t len = list.end() - list.begin();
         if (len > LEN) len = LEN;
         
-        memcpy(_buffer, list.begin(), len * sizeof(typet));
+        memcpy(_buffer, list.begin(), len * sizeof(type_t));
 
         return *this;
     }
@@ -272,7 +272,7 @@ struct Dynamic_Array {
 
     ~Dynamic_Array() {
         this->clear();   
-        _allocator.deallocate(_buffer_head);
+        _alloc.deallocate(_buffer_head);
         _buffer_head = NULL;
     }
 
@@ -289,10 +289,10 @@ struct Dynamic_Array {
     inline container_t& operator=(const container_t& other) {
         if (_buffer_head) {
             this->clear();
-            _allocator.deallocate(_buffer_head);
+            _alloc.deallocate(_buffer_head);
             _buffer_head = NULL;
         }
-        _buffer_head = _allocator.allocate<type_t>(other.capacity());
+        _buffer_head = _alloc.template allocate<type_t>(other.capacity());
         _buffer_tail = _buffer_head + other.capacity();
         _buffer_virtual_end = _buffer_head + other.size();
         debug_only(__size = _buffer_virtual_end - _buffer_head);
@@ -306,11 +306,11 @@ struct Dynamic_Array {
     inline container_t& operator=(const std::initializer_list<type_t>& list) {
         if (_buffer_head) {
             this->clear();
-            _allocator.deallocate(_buffer_head);
+            _alloc.deallocate(_buffer_head);
             _buffer_head = NULL;
         }
         size_t len = list.end() - list.begin();
-        _buffer_head = _allocator.allocate<type_t>(len);
+        _buffer_head = _alloc.template allocate<type_t>(len);
         _buffer_tail = _buffer_head + len;
         _buffer_virtual_end = _buffer_head + len;
         debug_only(__size = _buffer_virtual_end - _buffer_head);
@@ -349,7 +349,7 @@ struct Dynamic_Array {
     inline void reserve(size_t num) {
         if (capacity() >= num) return;
 
-        type_t* new_buffer = _allocator.allocate<type_t>(num);
+        type_t* new_buffer = _alloc.template allocate<type_t>(num);
         type_t* new_tail = new_buffer + num;
         type_t* new_virtual_end = new_buffer + size();
 
@@ -357,12 +357,12 @@ struct Dynamic_Array {
             //memcpy(new_buffer, _buffer_head, size() * sizeof(type_t));
 
             for (size_t i = 0; i < size(); i++) {
-                _allocator.construct(new_buffer + i, std::move(_buffer_head[i]));
+                _alloc.construct(new_buffer + i, std::move(_buffer_head[i]));
             
-                _allocator.destruct(_buffer_head + i);            
+                _alloc.destruct(_buffer_head + i);            
             }
 
-            _allocator.deallocate(_buffer_head);
+            _alloc.deallocate(_buffer_head);
             _buffer_head = NULL;
         }
 
@@ -376,12 +376,12 @@ struct Dynamic_Array {
     inline void resize(size_t num) {
         if (size() > num) {
             for (size_t i = num; i < size(); i++) {
-                _allocator.destruct(_buffer_head + i);
+                _alloc.destruct(_buffer_head + i);
             }
         } else {
             reserve(num);
             for (size_t i = size(); i < num; i++) {
-                _allocator.construct(_buffer_head + i, std::move(type_t()));
+                _alloc.construct(_buffer_head + i, std::move(type_t()));
             }
         }   
         _buffer_virtual_end = _buffer_head + num;
@@ -393,7 +393,7 @@ struct Dynamic_Array {
             reserve(capacity() + capacity());
         }
 
-        _allocator.construct(_buffer_head + size(), item);
+        _alloc.construct(_buffer_head + size(), item);
         _buffer_virtual_end++;
         debug_only(__size = _buffer_virtual_end - _buffer_head);
     }
@@ -402,7 +402,7 @@ struct Dynamic_Array {
             reserve(capacity() + capacity());
         }
 
-        _allocator.construct(_buffer_head + size(), std::move(item));
+        _alloc.construct(_buffer_head + size(), std::move(item));
         _buffer_virtual_end++;
         debug_only(__size = _buffer_virtual_end - _buffer_head);
     }
@@ -413,14 +413,14 @@ struct Dynamic_Array {
             reserve(capacity() + capacity());
         }
 
-        _allocator.construct(_buffer_head + size(), std::forward<args_t>(args)...);
+        _alloc.construct(_buffer_head + size(), std::forward<args_t>(args)...);
         _buffer_virtual_end++;
         debug_only(__size = _buffer_virtual_end - _buffer_head);
     }
 
     inline void pop_back() {
         assert(size() > 0 && "Cannot pop_back empty dynamic array");
-        _allocator.destruct(_buffer_virtual_end - 1);
+        _alloc.destruct(_buffer_virtual_end - 1);
         _buffer_virtual_end--;
         debug_only(__size--);
     }
@@ -428,7 +428,7 @@ struct Dynamic_Array {
     inline void erase(iterator_t it) {
         assert(it >= begin() && it < end() && "Invalid iterator");
         
-        _allocator.destruct(it._ptr);
+        _alloc.destruct(it._ptr);
 
         memmove(it._ptr, it._ptr + 1, _buffer_virtual_end - (it._ptr + 1));
 
@@ -451,7 +451,7 @@ struct Dynamic_Array {
         }
         
         for (iterator_t it = erase_begin; it < erase_end; ++it) {
-            _allocator.destruct(it._ptr);
+            _alloc.destruct(it._ptr);
         }
         
         if (erase_end == end()) {
@@ -470,13 +470,13 @@ struct Dynamic_Array {
 
     inline void clear() {
         for (type_t* ptr = _buffer_head; ptr < _buffer_virtual_end; ptr++) {
-            _allocator.destruct(ptr);
+            _alloc.destruct(ptr);
         }
         _buffer_virtual_end = _buffer_head;
         debug_only(__size = 0);
     }
 
-    alloc_t _allocator;
+    alloc_t _alloc;
     type_t* _buffer_head = NULL;
     type_t* _buffer_tail = NULL;
     type_t* _buffer_virtual_end = NULL;

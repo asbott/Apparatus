@@ -2,7 +2,7 @@
 
 #include "module.h"
 
-Module::Module(path_str_t mod_path, path_str_t mod_path_new, name_str_t str_id) {
+Module::Module(str_ptr_t mod_path, str_ptr_t mod_path_new, str_ptr_t str_id) {
     strcpy(this->mod_path, mod_path);
     strcpy(this->mod_path_new, mod_path_new);
     strcpy(this->str_id, str_id);
@@ -41,6 +41,7 @@ bool Module::load() {
     _mod_load_fn(load_from_disk);
 
     _mod_load_fn(init);
+    _mod_load_fn(deinit);
     _mod_load_fn(get_component_info);
     _mod_load_fn(get_component_ids);
     _mod_load_fn(create_component);

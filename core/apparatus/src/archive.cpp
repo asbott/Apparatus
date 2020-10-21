@@ -15,8 +15,17 @@ Binary_Archive::Binary_Archive(str_ptr_t file_path, size_t hint_size) : file_pat
         File_Info finfo;
         Path::get_info(file_path, &finfo);
 
-        byte* buffer_head = (byte*)malloc(finfo.size);
-        Path::read_all_bytes(file_path, buffer_head, finfo.size);
+        Dynamic_Array<byte> buffer;
+        buffer.resize(finfo.size);
+        Path::read_all_bytes(file_path, buffer.data(), finfo.size);
+
+        for (int i = buffer.size() - 1; i >= 0; i--) {
+            if (i + 1 < buffer.size() && buffer[i] == '\r' && buffer[i + 1] == '\n') {
+                buffer.erase(buffer.begin() + i);
+            }
+        }
+
+        byte* buffer_head = buffer.data();
 
         byte* buffer_ptr = buffer_head;
 
@@ -33,7 +42,7 @@ Binary_Archive::Binary_Archive(str_ptr_t file_path, size_t hint_size) : file_pat
         byte* sz_pos = NULL;
         byte* sz_end_pos = NULL;
         byte* item_pos = NULL;
-        for (; buffer_ptr < buffer_head + finfo.size; buffer_ptr++) {
+        for (; buffer_ptr < buffer_head + finfo.size + 1; buffer_ptr++) {
             if (mode == 0 && memcmp(buffer_ptr, ITEM_ID_TOKEN, sizeof(ITEM_ID_TOKEN)-1) == 0) {
                 buffer_ptr +=  sizeof(ITEM_ID_TOKEN)-1;
                 id_pos = buffer_ptr;

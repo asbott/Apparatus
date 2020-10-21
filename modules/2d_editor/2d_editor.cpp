@@ -127,8 +127,8 @@ fquad get_selection_quad(entt::registry& reg, entt::entity entity, Transform2D& 
 	return selection_quad;
 }
 
-extern "C" {
-	_export void __cdecl on_load() {
+module_scope {
+	module_function(void) on_load() {
 		register_gui_window(&g_editor_view);
 
 		g_asset_module = get_module("asset_manager");
@@ -137,7 +137,7 @@ extern "C" {
 		g_editor_cam.render_target = get_graphics()->make_render_target({ 1920, 1080 });
 	}
 
-	_export void __cdecl on_unload() {
+	module_function(void) on_unload() {
 		Graphics_Context* graphics = get_graphics();
 
 		graphics->destroy_render_target(g_editor_cam.render_target);
@@ -145,21 +145,21 @@ extern "C" {
 		unregister_gui_window(&g_editor_view);
 	}
 
-	_export void __cdecl on_play_begin() {
+	module_function(void) on_play_begin() {
 
 	}
 
-	_export void __cdecl on_play_stop() {
+	module_function(void) on_play_stop() {
 
 	}
 
-	_export void __cdecl on_update(float delta) {
+	module_function(void) on_update(float delta) {
 		(void)delta;
 
 		
 	}
 
-	_export void __cdecl on_render() {
+	module_function(void) on_render() {
 		auto graphics = get_graphics();
 
 		graphics->set_clear_color(g_editor_cam.clear_color, g_editor_cam.render_target);
@@ -209,11 +209,15 @@ extern "C" {
 		}
 
 		if (gizmo_list.enable) {
-			gizmo_list.flush();
+			defer([]() {
+				mz::fmat4 cam_transform = g_editor_cam.transform;
+				cam_transform.invert();
+				gizmo_list.flush(g_editor_cam.ortho * cam_transform, g_editor_cam.render_target);
+			});
 		}
 	}
 
-	_export void __cdecl on_gui() {
+	module_function(void) on_gui() {
 		Graphics_Context* graphics = get_graphics();
 		static bool is_game_hovered = false;
 		ImGuiWindowFlags flags = ImGuiWindowFlags_None;
@@ -391,7 +395,7 @@ extern "C" {
 		}, flags);
 	}
 
-	_export void* __cdecl get_function_library() {
+	module_function(void*) get_function_library() {
 		static Editor_2D_Function_Library lib;
 
 		lib.get_view = []() {

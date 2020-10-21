@@ -129,8 +129,8 @@ AP_API thread_id_t get_graphics_thread();
 
 AP_API entt::registry& get_entity_registry();
 
-AP_API void register_module(name_str_t mod_name);
-AP_API Module* get_module(name_str_t str_id);
+AP_API void register_module(str_ptr_t mod_name);
+AP_API Module* get_module(str_ptr_t str_id);
 
 AP_API void register_gui_window(Gui_Window* wnd);
 AP_API void unregister_gui_window(Gui_Window* wnd);
@@ -150,5 +150,9 @@ AP_API str_ptr_t get_user_directory();
 AP_API void open_file_browser(File_Browser_Mode mode, std::function<void(str_ptr_t)> result_callback = 0);
 
 AP_API bool is_playing();
+
+// Defer code to run after current module function has been
+// invoked in other modules
+AP_API void defer(std::function<void()> fn);
 
 AP_API int start(int argc, char** argv);
