@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "./2d_particles_simulator.h"
+#include "D:/dev/Apparatus/modules/2d_particles_simulator/2d_particles_simulator.h"
 
 #include <vector>
 #include <functional>

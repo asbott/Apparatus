@@ -52,7 +52,7 @@ namespace os {
 		std::wstring wpath = p.wstring();
 		return (void*)LoadLibraryEx(wpath.c_str(), NULL, LOAD_IGNORE_CODE_AUTHZ_LEVEL);
 	}
-	void* load_module_function(module_t mod, str_ptr_tname_of_function) {
+	void* load_module_function(module_t mod, str_ptr_t name_of_function) {
 		HMODULE lib = (HMODULE)mod;
 		return (void*)GetProcAddress(lib, name_of_function);
 	}

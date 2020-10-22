@@ -35,21 +35,21 @@ namespace ImGui {
     bool RInputText(const char* label, char* buf, size_t buf_size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
         str_t<128> id = "";
-        sprintf(id, "##%lu", (u64)buf);
+        sprintf(id, "##%llu", (unsigned long long)buf);
         bool ret = InputText(id, buf, buf_size, flags, callback, user_data);
         return ret;
     }
     bool RInputTextMultiline(const char* label, char* buf, size_t buf_size, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
         str_t<128> id = "";
-        sprintf(id, "##%lu", (u64)buf);
+        sprintf(id, "##%llu", (unsigned long long)buf);
         bool ret = InputTextMultiline(id, buf, buf_size, size, flags, callback, user_data);
         return ret;
     }
     bool RInputTextWithHint(const char* label, const char* hint, char* buf, size_t buf_size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
         set_layout(label);
         str_t<128> id = "";
-        sprintf(id, "##%lu", (u64)buf);
+        sprintf(id, "##%llu", (unsigned long long)buf);
         bool ret = InputTextWithHint(id, hint, buf, buf_size, flags, callback, user_data);
         return ret;
     }
@@ -325,7 +325,7 @@ namespace ImGui {
     bool RBeginCombo(const char* label, const char* preview_value, ImGuiComboFlags flags) {
         set_layout(label);
         str_t<22> id = "";
-        sprintf(id, "##%lu", (u64)preview_value + (u64)label);
+        sprintf(id, "##%llu", (unsigned long long)preview_value + (unsigned long long)label);
         bool ret = BeginCombo(id, preview_value, flags);
         return ret;
     }
@@ -386,6 +386,26 @@ namespace ImGui {
         if (archive.is_valid_id("imgui_ext_style")) {
             ImGuiExtensionStyle& loaded_style = archive.read<ImGuiExtensionStyle>("imgui_ext_style");
             memcpy(&ImGui::GetExtensionStyle(), &loaded_style, sizeof(ImGuiExtensionStyle));
+        }
+    }
+
+    namespace Filters {
+        int AlphaNumericNoSpace(ImGuiTextEditCallbackData* data) {
+            if ((data->EventChar >= '0' && data->EventChar <= '9') 
+             || (data->EventChar >= 'A' && data->EventChar <= 'Z')
+             || (data->EventChar >= 'a' && data->EventChar <= 'z')
+             || (data->EventChar == '_')) 
+                 return 0;
+            return 1;
+        }
+        int AlphaNumeric(ImGuiTextEditCallbackData* data) {
+            if ((data->EventChar >= '0' && data->EventChar <= '9') 
+             || (data->EventChar >= 'A' && data->EventChar <= 'Z')
+             || (data->EventChar >= 'a' && data->EventChar <= 'z')
+             || (data->EventChar == '_')
+             || (data->EventChar == ' ')) 
+                 return 0;
+            return 1;
         }
     }
     

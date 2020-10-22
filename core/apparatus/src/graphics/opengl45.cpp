@@ -795,7 +795,10 @@ void OpenGL45::set_texture_data(graphics_id_t texture, byte* data, mz::ivec2 siz
         data
     );
 
+    glGenerateMipmap(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, 0);
+    
+
 }
 void OpenGL45::set_texture_wrapping(graphics_id_t texture, graphics_enum_t wrap_mode) {
     make_context_current();

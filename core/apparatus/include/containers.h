@@ -102,6 +102,12 @@ struct Thread_Safe_Queue {
 template <typename type_t>
 struct Packed_Container_Iterator {
 
+    using difference_type   = uintptr_t;
+    using value_type        = type_t;
+    using pointer           = type_t*;
+    using reference         = type_t&;
+    using iterator_category = nullptr_t;
+
     typedef Packed_Container_Iterator<type_t> iterator_t;
 
     Packed_Container_Iterator() = delete;
@@ -150,6 +156,15 @@ struct Packed_Container_Iterator {
     inline friend iterator_t operator -(const iterator_t& lhs, size_t rhs) {
         return lhs._ptr - rhs;
     }
+
+    inline friend difference_type operator +(const iterator_t& lhs, const iterator_t& rhs) {
+        return lhs._ptr + rhs._ptr;
+    }
+    inline friend difference_type operator -(const iterator_t& lhs, const iterator_t& rhs) {
+        return lhs._ptr - rhs._ptr;
+    }
+
+    
 
     type_t* _ptr;
 };

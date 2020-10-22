@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "./2d_sprite_renderer.h"
+#include "D:/dev/Apparatus/modules/2d_sprite_renderer/2d_sprite_renderer.h"
 
 #include <vector>
 #include <functional>

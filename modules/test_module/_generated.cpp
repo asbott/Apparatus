@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "./test_module.h"
+#include "D:/dev/Apparatus/modules/test_module/test_module.h"
 
 #include <vector>
 #include <functional>

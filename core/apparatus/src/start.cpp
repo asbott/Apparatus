@@ -161,7 +161,7 @@ void load_icon(Icon_Type type, str_ptr_t dir, str_ptr_t offset_path) {
 
     graphics_id_t icon = g_graphics->make_texture(G_BUFFER_USAGE_STATIC_WRITE);
 
-    g_graphics->set_texture_filtering(icon, G_MIN_FILTER_LINEAR, G_MAG_FILTER_NEAREST);
+    g_graphics->set_texture_filtering(icon, G_MIN_FILTER_LINEAR_MIPMAP_NEAREST, G_MAG_FILTER_NEAREST);
 
     g_graphics->set_texture_wrapping(icon, G_WRAP_CLAMP_TO_BORDER);
 
@@ -240,7 +240,7 @@ void to_file(entt::registry& reg, str_ptr_t dir_path) {
     Path::create_directory(dir_path);
     reg.view<Entity_Info>().each([&reg, &dir_path](entt::entity entity, Entity_Info& entity_info) {
         path_str_t file_path = "";
-        sprintf(file_path, "%s/%s", dir_path, entity_info.name);
+        sprintf(file_path, "%s/%s%lu", dir_path, entity_info.name, (unsigned long)entity);
         Binary_Archive entity_archive(file_path);
 
         entity_archive.write("name", entity_info.name);
@@ -252,14 +252,18 @@ void to_file(entt::registry& reg, str_ptr_t dir_path) {
                 if (!mod->has_component(comp_id, reg, entity)) continue;
                 ncomponents++;
                 const auto& info = mod->get_component_info(comp_id);
-                path_str_t comp_file_path = "";
-                sprintf(comp_file_path, "%s/%s.%s", dir_path, entity_info.name, info->name.c_str());
+                path_str_t comp_rel_path = "";
+                sprintf(comp_rel_path, "%s/%s%lu.%s", dir_path, entity_info.name, (unsigned long)entity, info->name.c_str());
+                Path::to_relative(comp_rel_path, dir_path, comp_rel_path);
 
                 str_t<sizeof("component_") + 1> id = "";
-                sprintf(id, "component_%lu", ncomponents);
-                entity_archive.write(id, comp_file_path);
+                sprintf(id, "component_%llu", (unsigned long long)ncomponents);
+                entity_archive.write(id, comp_rel_path);
 
-                Binary_Archive comp_archive(comp_file_path);
+                path_str_t comp_abs_path = "";
+                sprintf(comp_abs_path, "%s/%s", dir_path, comp_rel_path);
+                Binary_Archive comp_archive(comp_abs_path);
+                comp_archive.write("module", mod->str_id);
                 for (const auto& prop : info->properties) {
                     entity_name_t prop_name = "";
                     strcpy(prop_name, prop.name.c_str());
@@ -276,42 +280,66 @@ void to_file(entt::registry& reg, str_ptr_t dir_path) {
 }
 
 void from_file(entt::registry& reg, str_ptr_t dir_path) {
-    Path::iterate_directories(dir_path, [&reg](str_ptr_t entry) {
+    Path::iterate_directories(dir_path, [&reg, &dir_path](str_ptr_t entry) {
         if (Path::is_file(entry) && !Path::has_extension(entry)) {
-            entity_name_t entity_name = "";
-            Path::name_without_extension(entry, entity_name);
+
+            Binary_Archive entity_archive(entry);
+            if (!entity_archive.is_valid_id("ncomponents") || !entity_archive.is_valid_id("name")) return;
 
             entt::entity entity = reg.create();
+            entity_name_t entity_name = "";
+            strcpy(entity_name, (char*)entity_archive.read("name"));
             auto& entity_info = reg.emplace<Entity_Info>(entity);
             strcpy(entity_info.name, entity_name);
             entity_info.id = entity;
-
-            Binary_Archive entity_archive(entry);
-            if (!entity_archive.is_valid_id("ncomponents")) return;
 
             size_t ncomponents = entity_archive.read<size_t>("ncomponents");
 
             for (size_t i = 0; i < ncomponents; i++) {
                 str_t<sizeof("component_") + 1> id = "";
-                sprintf(id, "component_%lu", i + 1);
+                sprintf(id, "component_%llu", (unsigned long long)i + 1);
                 if (entity_archive.is_valid_id(id)) {
                     str_ptr_t comp_path = entity_archive.read<path_str_t>(id);
 
                     path_str_t comp_name = "";
                     Path::extension_of(comp_path, comp_name);
-                    void* comp = NULL;
+
+                    path_str_t comp_real_path = "";
+                    sprintf(comp_real_path, "%s/%s", dir_path, comp_path);
+                    Binary_Archive comp_archive(comp_real_path);
+
+                    if (!comp_archive.is_valid_id("module") || comp_archive.size_of("module") != sizeof(Module::str_id)) {
+                        log_warn("Component '{}' on entity '{}' could not be loaded because module name was not found in archive",
+                                  comp_name, entity_name);
+                        continue;
+                    }
+
+                    name_str_t mod_str_id = "";
+                    memcpy(mod_str_id, comp_archive.read("module"), comp_archive.size_of("module"));
+
+                    Module* comp_mod = get_module(mod_str_id);
+
+                    if (!comp_mod) {
+                        log_error("Component '{}' on entity '{}' could not be loaded because no registered module with str_id '{}' was found",
+                                   comp_name, entity_name, mod_str_id);
+                        continue;
+                    }
+
                     uintptr_t comp_id = 0;
-                    Module* comp_mod = NULL;
-                    for (auto* mod : g_modules) if (mod->is_loaded && mod->get_component_id(comp_name)) {
-                        comp_id = mod->get_component_id(comp_name);
-                        comp = mod->create_component(comp_id, reg, entity);
-                        comp_mod = mod;
-                        break;
-                    } 
+                    void* comp = NULL;
+                    for (auto type_id : comp_mod->get_component_ids()) {
+                        auto info = comp_mod->get_component_info(type_id);
+                        if (strcmp(info->name.c_str(), comp_name) == 0) {
+                            comp_id = type_id;
+                            comp = comp_mod->create_component(type_id, reg, entity);
+                            break;
+                        }
+                    }
 
-                    if (!comp || !comp_id) continue;
-
-                    Binary_Archive comp_archive(comp_path);
+                    if (!comp_id || !comp) {
+                        log_error("Could not find component with name '{}' when loading entity '{}'. Name might have been changed.", comp_name, entity_name);
+                        continue;
+                    }
 
                     comp_archive.iterate([&comp_id, comp_mod, &comp, &comp_archive](str_ptr_t id) {
                         const auto& comp_info = comp_mod->get_component_info(comp_id);
@@ -490,16 +518,8 @@ void do_file_browser_gui() {
     if (ImGui::BeginMenu("Create directory")) {
         path_str_t new_dir_name = "";
         auto flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCharFilter;
-        static auto char_filter = [](ImGuiTextEditCallbackData* data) { 
-
-            if ((data->EventChar >= '0' && data->EventChar <= '9') 
-             || (data->EventChar >= 'A' && data->EventChar <= 'Z')
-             || (data->EventChar >= 'a' && data->EventChar <= 'z')
-             || (data->EventChar == '_')) 
-                 return 0;
-            return 1;
-        };
-        bool enter = ImGui::RInputText("name", new_dir_name, sizeof(new_dir_name), flags, char_filter);
+        
+        bool enter = ImGui::RInputText("name", new_dir_name, sizeof(new_dir_name), flags, ImGui::Filters::AlphaNumericNoSpace);
 
         if (strcmp(new_dir_name, "") != 0 && (enter || ImGui::Button("Ok##createdir"))) {
             path_str_t full_dir = "";
@@ -692,34 +712,120 @@ int start(int argc, char** argv) {
     add_component_popup.is_modal = true;
     strcpy(add_component_popup.str_id, "Add Component");
     add_component_popup.fn = [](){
+        static int sort_mode = 0;
+        static auto sort_mode_str = [](int sort_mode) {
+            switch (sort_mode) {
+                case 0: return "module";
+                case 1: return "name";
+                default: return "N/A";
+            }
+        };
+
+        if (ImGui::RBeginCombo("Sort by", sort_mode_str(sort_mode))) {
+
+            if (ImGui::Selectable(sort_mode_str(0))) {
+                sort_mode = 0;
+            }
+            if (ImGui::Selectable(sort_mode_str(1))) {
+                sort_mode = 1;
+            }
+
+            ImGui::REndCombo();
+        }
+
+        struct Comp_Entry {
+            str_ptr_t name;
+            uintptr_t id;
+            Module* mod;
+            Icon_Type icon;
+        };
+        static Dynamic_Array<Comp_Entry> sorted_names;
+
         for (auto* mod : g_modules)  {
             if (!mod->is_loaded) continue;
             const auto& ids = mod->get_component_ids();
-            if (ids.size() > 0 && ImGui::CollapsingHeader(mod->str_id)) {
-                for (auto id : ids) {
-                    const auto& info = mod->get_component_info(id);
-                    if (g_selected_entities.size() == 1) {
-                        ImGuiSelectableFlags flags = ImGuiSelectableFlags_None;
-                        if (mod->has_component(id, g_reg, *g_selected_entities.begin())) 
-                            flags |= ImGuiSelectableFlags_Disabled;
-                        if (ImGui::Selectable(info->name.c_str(), false, flags)) {
-                            mod->create_component(id, g_reg, *g_selected_entities.begin());
-                            ImGui::CloseCurrentPopup();
-                        }
-                    } else {
-                        if (ImGui::Selectable(info->name.c_str())) {
-                            for (auto selected_entity : g_selected_entities) {
-                                if (mod->get_component(id, g_reg, selected_entity) == NULL)
-                                    mod->create_component(id, g_reg, selected_entity);   
-                            }
-                            ImGui::CloseCurrentPopup();
-                        }
-                    }
-                }
+            
+            for (auto id : ids) {
+                const auto& info = mod->get_component_info(id);
+                sorted_names.push_back({ info->name.c_str(), id, mod, info->icon });
             }
         }
 
+        static auto str_score = [](str_ptr_t str, u32 n) {
+            u32 score = 0;
+            for (size_t i = 0; i < (n > strlen(str) ? strlen(str) : n); i++) {
+                if (isalpha(str[i])) score += (u32)'Z' - (u32)toupper(str[i]);
+                else score += (u32)str[i];
+            }
+            return score;
+        };
+
+        if (sort_mode == 0) {
+            std::sort(sorted_names.begin(), sorted_names.end(), [](const Comp_Entry& a, const Comp_Entry& b) {
+                for (int i = 0; i < (strlen(a.mod->str_id) > strlen(b.mod->str_id) ? strlen(b.mod->str_id) : strlen(a.mod->str_id)); i++) {
+                    if (str_score(a.mod->str_id, i) > str_score(b.mod->str_id, i)) return true;
+                    if (str_score(a.mod->str_id, i) < str_score(b.mod->str_id, i)) return false;
+                }
+                return a.id > b.id;
+            });
+        } else if (sort_mode == 1) {
+            std::sort(sorted_names.begin(), sorted_names.end(), [](const Comp_Entry& a, const Comp_Entry& b) {
+                for (int i = 0; i < (strlen(a.name) > strlen(b.name) ? strlen(b.name) : strlen(a.name)); i++) {
+                    if (str_score(a.name, i) > str_score(b.name, i)) return true;
+                    if (str_score(a.name, i) < str_score(b.name, i)) return false;
+                }
+                return a.id > b.id;
+            });
+        }
+
+        static comp_name_t search_filter = "";
+        ImGui::RInputText("Filter", search_filter, sizeof(search_filter));
+
+        for (auto entry : sorted_names) {
+
+            bool any_match = false;
+            comp_name_t search_filter_upper = "";
+            strcpy(search_filter_upper, search_filter);
+            for (size_t i = 0; i < strlen(search_filter); i++) search_filter_upper[i] = toupper(search_filter[i]);
+            for (size_t i = 0; i < strlen(entry.name); i++) {
+                comp_name_t entry_name_upper = "";
+                strcpy(entry_name_upper, entry.name);
+                for (size_t j = 0; j < strlen(entry.name); j++) entry_name_upper[j] = toupper(entry.name[j]);
+                if (strlen(search_filter_upper) > strlen(entry_name_upper + i)) break;
+                if (memcmp(entry_name_upper + i, search_filter_upper, strlen(search_filter_upper)) == 0) {
+                    any_match = true;
+                    break;
+                }
+            }
+            if (!any_match) continue;
+
+            ImGuiSelectableFlags flags = ImGuiSelectableFlags_None;
+            if (g_selected_entities.size() == 1 && entry.mod->has_component(entry.id, g_reg, *g_selected_entities.begin())) {
+                flags |= ImGuiSelectableFlags_Disabled;
+            }
+            f32 sz = ImGui::GetIO().FontDefault->FontSize;
+            ImGui::Icon(entry.icon, { sz, sz });
+            ImGui::SameLine();
+            if (ImGui::Selectable(entry.name, false, flags)) {
+                for (auto selected_entity : g_selected_entities) {
+                    entry.mod->create_component(entry.id, g_reg, selected_entity);
+                }
+                memset(search_filter, 0, sizeof(search_filter));
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            name_str_t mod_str = "";
+            sprintf(mod_str, "(%s)", entry.mod->str_id);
+            ImGui::SetCursorPosX(ImGui::GetWindowContentRegionWidth() - ImGui::CalcTextSize(mod_str).x - ImGui::GetWindowContentRegionWidth() * .05f);
+            ImGui::TextDisabled("%s", mod_str);
+
+            ImGui::Spacing();
+        }
+
+        sorted_names.clear();
+
         if (ImGui::Button("Cancel")) {
+            memset(search_filter, 0, sizeof(search_filter));
             ImGui::CloseCurrentPopup();
         }
     };
@@ -784,12 +890,13 @@ int start(int argc, char** argv) {
     
     ImGui::GetIO().Fonts->Build();
 
-    load_icon(ICON_TYPE_STOP,    essential_dir, "stop_icon.png");
-    load_icon(ICON_TYPE_PLAY,    essential_dir, "play_icon.png");
-    load_icon(ICON_TYPE_OPTIONS, essential_dir, "options_icon.png");
-    load_icon(ICON_TYPE_TEXTURE, essential_dir, "texture_icon.png");
-    load_icon(ICON_TYPE_FOLDER,  essential_dir, "vendor/folder_icon.png");
-    load_icon(ICON_TYPE_FILE,    essential_dir, "file_icon.png");
+    load_icon(ICON_TYPE_STOP,      essential_dir, "stop_icon.png");
+    load_icon(ICON_TYPE_PLAY,      essential_dir, "play_icon.png");
+    load_icon(ICON_TYPE_OPTIONS,   essential_dir, "options_icon.png");
+    load_icon(ICON_TYPE_TEXTURE,   essential_dir, "texture_icon.png");
+    load_icon(ICON_TYPE_FOLDER,    essential_dir, "vendor/folder_icon.png");
+    load_icon(ICON_TYPE_FILE,      essential_dir, "file_icon.png");
+    load_icon(ICON_TYPE_DATA,      essential_dir, "data_icon.png");
 
     path_str_t ini_path = "";
     sprintf(ini_path, "%s/imgui.ini", g_user_dir);
@@ -986,15 +1093,18 @@ int start(int argc, char** argv) {
             if (ImGui::BeginMenu("Create")) {
 
                 static str_t<128> buf;
-                ImGui::RInputText("Name", buf, sizeof(buf));
 
-                if (ImGui::Button("Create")) {
+                ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue
+                                          | ImGuiInputTextFlags_CallbackCharFilter;
+                if (ImGui::RInputText("Name", buf, sizeof(buf), flags, ImGui::Filters::AlphaNumeric) || ImGui::MenuItem("Create") && strlen(buf)) {
                     auto entity = g_reg.create();
                     g_reg.emplace<Entity_Info>(entity);
                     g_reg.get<Entity_Info>(entity).id = entity;
                     strcpy(g_reg.get<Entity_Info>(entity).name, buf);
                     strcpy(buf, "");
                 }
+
+                if (ImGui::IsKeyReleased(AP_KEY_ENTER)) ImGui::CloseCurrentPopup();
 
                 ImGui::EndMenu();
             }
@@ -1029,6 +1139,7 @@ int start(int argc, char** argv) {
         ImGui::DoGuiWindow(&entity_inspector, [&]() {
             for (auto selected_entity : g_selected_entities) {
                 if (g_reg.valid(selected_entity)) {
+                    ImGui::Separator();
                     for (auto* mod : g_modules) {
                         if (!mod->is_loaded) continue;
                         const auto& ids = mod->get_component_ids();
@@ -1044,9 +1155,15 @@ int start(int argc, char** argv) {
                                                             | ImGuiTreeNodeFlags_OpenOnDoubleClick 
                                                             //| ImGuiTreeNodeFlags_CollapsingHeader 
                                                             | ImGuiTreeNodeFlags_NoAutoOpenOnLog
-                                                            | ImGuiTreeNodeFlags_AllowItemOverlap;
+                                                            | ImGuiTreeNodeFlags_SpanFullWidth;
 
-                                bool component_opened = ImGui::TreeNodeEx(info->name.c_str(), flags);
+                                comp_name_t str_id = "";
+                                sprintf(str_id, "##%s", info->name.c_str());
+                                bool component_opened = ImGui::TreeNodeEx(str_id, flags);
+                                ImGui::SameLine();
+                                ImGui::Icon(info->icon, mz::ivec2((s32)ImGui::GetIO().FontDefault->FontSize));
+                                ImGui::SameLine();
+                                ImGui::Text("%s", info->name.c_str());
 
                                 if (ImGui::IsItemClicked(1)) {
                                     manage_component_popup.should_open = true;
@@ -1064,8 +1181,15 @@ int start(int argc, char** argv) {
                                     };
                                 }
 
+                                ImGui::SameLine();
+                                name_str_t mod_str = "";
+                                sprintf(mod_str, "(%s)", mod->str_id);
+                                ImGui::SetCursorPosX(ImGui::GetWindowContentRegionWidth() - ImGui::CalcTextSize(mod_str).x - ImGui::GetWindowContentRegionWidth() * .05f);
+                                ImGui::TextDisabled("%s", mod_str);
+
                                 mod->set_imgui_context(ImGui::GetCurrentContext());
                                 if (component_opened) {
+                                    ImGui::Separator();
                                     if (info->has_custom_gui && info->properties.size() > 0) {
                                         info->properties[0].on_gui(comp);
                                     } else {

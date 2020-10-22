@@ -10,6 +10,13 @@
 
 #include <imgui.h>
 
+enum Icon_Type : u8 {
+	ICON_TYPE_STOP, ICON_TYPE_PLAY, ICON_TYPE_OPTIONS, ICON_TYPE_TEXTURE,
+	ICON_TYPE_FOLDER, ICON_TYPE_FILE, ICON_TYPE_DATA,
+
+	ICON_TYPE_COUNT
+};
+
 typedef str_t<256> entity_name_t;
 typedef str_t<128> comp_name_t;
 
@@ -39,6 +46,8 @@ struct Component_Info {
 	size_t size;
 
 	std::vector<Property_Info> properties;
+
+	Icon_Type icon = ICON_TYPE_DATA;
 };
 
 struct Game_Input {
@@ -88,12 +97,7 @@ struct Gui_Payload {
 	void* home;
 };
 
-enum Icon_Type : u8 {
-	ICON_TYPE_STOP, ICON_TYPE_PLAY, ICON_TYPE_OPTIONS, ICON_TYPE_TEXTURE,
-	ICON_TYPE_FOLDER, ICON_TYPE_FILE,
 
-	ICON_TYPE_COUNT
-};
 
 #include "imgui_extension.h"
 

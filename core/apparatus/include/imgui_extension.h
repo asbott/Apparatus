@@ -65,4 +65,9 @@ namespace ImGui {
 
     AP_API void SaveStyleToDisk(str_ptr_t path);
     AP_API void LoadStyleFromDisk(str_ptr_t path);
+
+    namespace Filters {
+        AP_API int AlphaNumericNoSpace(ImGuiTextEditCallbackData* data);
+        AP_API int AlphaNumeric(ImGuiTextEditCallbackData* data);
+    }
 }

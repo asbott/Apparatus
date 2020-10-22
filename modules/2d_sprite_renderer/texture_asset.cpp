@@ -28,12 +28,11 @@ byte* load(byte* stream, str_ptr_t path, void* parameter) {
         return NULL;
     }
 
-    graphics->set_texture_filtering(tex.graphics_id, params.mag_filter, params.mag_filter);
+    graphics->set_texture_filtering(tex.graphics_id, params.min_filter, params.mag_filter);
     graphics->set_texture_wrapping(tex.graphics_id, params.wrap_mode);
 
     size_t img_size = tex.size.width * tex.size.height * tex.channels;
 
-    //runtime_data.resize(runtime_data.size() + sizeof(Texture_Data) + img_size);
     tex.data = stream + sizeof(Texture_Data);
 
     memcpy(stream, &tex, sizeof(Texture_Data));

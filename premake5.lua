@@ -82,7 +82,6 @@ workspace "apparatus"
         objdir     ("lib/%{prj.name}-int")
         vectorextensions "SSE4.1"
         location "core/apparatus"
-        staticruntime "on"
 
         flags {
             "FatalWarnings",
@@ -184,7 +183,6 @@ workspace "apparatus"
         objdir     ("lib/%{prj.name}-int")
         vectorextensions "SSE4.1"
         location "core/launcher"
-        staticruntime "on"
 
         flags {
             "FatalWarnings",
@@ -230,7 +228,6 @@ workspace "apparatus"
         objdir     ("lib/%{prj.name}-int")
         files { "%{prj.location}/**.cpp", "%{prj.location}/**.h" }
         location "core/parser"
-        staticruntime "on"
         filter "system:linux"
             pic "on"
 
@@ -242,9 +239,6 @@ workspace "apparatus"
         warnings   "Off"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
-        staticruntime "on"
-        filter "system:linux"
-            pic "on"
 
         files {
             "deps/glfw/include/glfw/glfw3.h",
@@ -275,6 +269,10 @@ workspace "apparatus"
                 "_GLFW_WIN32"
             }
 
+       
+
+            
+
         filter "system:linux"
             pic "On"
 
@@ -303,9 +301,6 @@ workspace "apparatus"
         warnings   "Off"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
-        staticruntime "on"
-        filter "system:linux"
-            pic "on"
 
         files {
             "deps/glad/include/glad/glad.h",
@@ -325,9 +320,7 @@ workspace "apparatus"
         warnings   "Off"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
-        staticruntime "on"
-        filter "system:linux"
-            pic "on"
+        
 
         files
         {
@@ -349,6 +342,7 @@ workspace "apparatus"
         includedirs 
         { 
             "deps/imgui",
+            "",
             "deps/glfw/include",
             "deps/glad/include"
         }
@@ -357,6 +351,8 @@ workspace "apparatus"
 
         filter "system:windows"
             files { "deps/imgui/backends/imgui_impl_dx11.cpp" }
+        filter "system:linux"
+            pic "on"
 
     project "box2d"
         location   "deps/box2d"
@@ -365,7 +361,6 @@ workspace "apparatus"
         warnings   "Off"
         targetdir  ("lib/%{prj.name}")
         objdir     ("lib/%{prj.name}-int")
-        staticruntime "on"
 
         files
         {

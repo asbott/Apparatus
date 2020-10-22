@@ -19,7 +19,7 @@ Binary_Archive::Binary_Archive(str_ptr_t file_path, size_t hint_size) : file_pat
         buffer.resize(finfo.size);
         Path::read_all_bytes(file_path, buffer.data(), finfo.size);
 
-        for (int i = buffer.size() - 1; i >= 0; i--) {
+        for (int i = (int)buffer.size() - 1; i >= 0; i--) {
             if (i + 1 < buffer.size() && buffer[i] == '\r' && buffer[i + 1] == '\n') {
                 buffer.erase(buffer.begin() + i);
             }
