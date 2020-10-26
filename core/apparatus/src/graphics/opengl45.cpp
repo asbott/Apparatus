@@ -332,6 +332,7 @@ void OpenGL45::init(bool show_window) {
             f64 time = glfwGetTime();
             auto& wnd_info = _windows_context.window_info[wnd];
             wnd_info.delta_time = time > 0 ? time - wnd_info._last_time : (double)1 / (double)60;
+            if (wnd_info.delta_time > 1.f) wnd_info.delta_time = 1.f;
             wnd_info._last_time = time;
         });
     };
@@ -552,6 +553,10 @@ void OpenGL45::set_depth_testing(bool value) {
 
         send_message(G_DEBUG_MESSAGE_SEVERITY_NOTIFY, "Disabled depth testing");
     }
+}
+
+void OpenGL45::set_line_size(f32 sz) {
+    glLineWidth(sz);
 }
 
 graphics_id_t OpenGL45::make_vertex_array(const Buffer_Layout_Specification& layout) {

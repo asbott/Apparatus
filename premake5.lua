@@ -154,8 +154,8 @@ workspace "apparatus"
             }
 
             postbuildcommands {
-                "mkdir -p %{wks.location}lib/runtime/",
-                "mkdir -p %{wks.location}lib/launcher/",
+                "mkdir -p %{wks.location}/lib/runtime/",
+                "mkdir -p %{wks.location}/lib/launcher/",
                 "cp %{wks.location}/lib/%{prj.name}/lib%{prj.name}.so %{wks.location}/lib/launcher/%{prj.name}.so",
                 "cp %{wks.location}/lib/%{prj.name}/lib%{prj.name}.so %{wks.location}/lib/runtime/%{prj.name}.so"
             }

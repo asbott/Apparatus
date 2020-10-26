@@ -8,7 +8,7 @@ struct Asset_Directory {
     Asset_Directory(Asset_Directory* parent, str_ptr_t path) 
         : parent_directory(parent) {
         Path::name_with_extension(path, name);
-        strcpy(real_path, path);
+        Path::to_canonical(path, real_path);
     }
 
     Asset_Directory* parent_directory;
@@ -49,6 +49,7 @@ struct Asset_Loader {
         creatable = r.creatable;
         asset_icon = r.icon;
         strcpy(name, r.name);
+        runtime_data_size = r.runtime_data_size;
     }
     Hash_Set<Dynamic_String> extensions;
 	std::function<size_t(str_ptr_t, void*)> tell_size = 0;
@@ -58,22 +59,27 @@ struct Asset_Loader {
     std::function<void(void*)> set_default_params = 0;
     size_t param_size;
     name_str_t name = "N/A";
+    size_t runtime_data_size = 0;
 
     bool creatable;
 
     Icon_Type asset_icon = ICON_TYPE_FILE;
 };
 
+struct Free_Data_Block {
+    data_index_t index;
+    size_t size;
+};
+
 Gui_Window g_asset_manager = { true, "Asset Manager" };
 Gui_Window g_asset_inspector = { false, "Asset Inspector" };
-
-Gui_Popup g_manager_menu_popup;
 
 path_str_t g_current_dir;
 path_str_t g_assets_dir;
 
 Dynamic_Array<Asset> assets;
 Dynamic_Array<byte> runtime_data;
+Dynamic_Array<Free_Data_Block> free_data_blocks;
 
 Dynamic_Array<Asset_Loader> loaders;
 
@@ -88,6 +94,8 @@ Asset_Directory* g_selected_dir = NULL;
 asset_id_t g_selected_asset = NULL_ASSET_ID;
 
 Hash_Set<u32> taken_uids;
+
+bool g_any_dir_rightclick = false;
 
 u32 get_index(asset_id_t id) {
     u32 idx = 0;
@@ -146,7 +154,7 @@ asset_id_t register_asset(str_ptr_t path, u32 uid = (u32)-1, void* params = NULL
     Path::name_with_extension(path, a.file_name);
     Path::name_without_extension(path, a.name);
     sprintf(a.meta_path, "%s/%s.%s", dir, a.name, "ap");
-
+    
     bool any_loader = false;
     index_t i = 0;
     for (auto& loader : loaders) {
@@ -159,6 +167,7 @@ asset_id_t register_asset(str_ptr_t path, u32 uid = (u32)-1, void* params = NULL
             }
 
             a.loader = i;
+            a.runtime_data_size = loader.runtime_data_size;
 
             a.icon = loader.asset_icon;
 
@@ -217,7 +226,18 @@ data_index_t load_to_memory(asset_id_t id) {
 
     size_t sz = loader.tell_size(asset->path, asset->load_param);
 
-    runtime_data.resize(runtime_data.size() + sz);
+    bool need_resize = true;
+    for (int i = (int)free_data_blocks.size() - 1; i >= 0; i--) {
+        if (free_data_blocks[i].size >= sz) {
+            data_index = free_data_blocks[i].index;
+            need_resize = false;
+            break;
+        }
+    }
+
+    if (need_resize) {
+        runtime_data.resize(runtime_data.size() + sz);
+    }
 
     byte* stream = runtime_data.data() + data_index;
 
@@ -235,6 +255,8 @@ bool unload_from_memory(asset_id_t id) {
     ap_assert(index < assets.size());
     Asset* asset = &assets[index];
     ap_assert(!asset->in_use, "Cannot unload an asset that's in use");
+
+    free_data_blocks.push_back({ index, asset->runtime_data_size });
 
     auto& loader = loaders[asset->loader];
     loader.unload(runtime_data.data() + asset->data_index);
@@ -264,6 +286,9 @@ Asset* begin_use(asset_id_t id) {
     number_of_assets_in_use++;
 
     Asset* asset = &assets[index];
+
+    ap_assert(!asset->in_use, "Cannot begin use on an asset that's already in use");
+
     asset->in_use = true;
     asset->usage_points++;
 
@@ -285,7 +310,8 @@ void end_use(asset_id_t id) {
 }
 
 void do_asset_manager_menu_gui(Asset_Directory* dir) {
-
+    ImGui::Text(dir->real_path);
+    ImGui::Separator();
     if (ImGui::BeginMenu("Create")) {
 
         static name_str_t create_name = "";
@@ -410,14 +436,6 @@ module_scope {
         register_gui_window(&g_asset_inspector);
 
         strcpy(g_current_dir, get_executable_directory());
-
-        g_manager_menu_popup.is_modal = false;
-        strcpy(g_manager_menu_popup.str_id, "Asset Manager Menu");
-        g_manager_menu_popup.fn = []() {
-            do_asset_manager_menu_gui(g_selected_dir);
-        };
-
-        register_gui_popup(&g_manager_menu_popup);
     }
 
     module_function(void) save_to_disk(str_ptr_t dir) {
@@ -531,8 +549,6 @@ module_scope {
 
         unregister_gui_window(&g_asset_manager);
         unregister_gui_window(&g_asset_inspector);
-
-        unregister_gui_popup(&g_manager_menu_popup);
     }
 
     module_function(void) on_update(float delta) {
@@ -545,6 +561,7 @@ module_scope {
         
     }
 
+    
     void do_dir_gui(Asset_Directory& dir, int depth = 0) {
 
         ImGuiTreeNodeFlags flags = 0;
@@ -569,6 +586,13 @@ module_scope {
 
         if (ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1)) {
             g_selected_dir = &dir;
+        }
+
+        
+        if (ImGui::BeginPopupContextItem(dir.real_path)) {
+            g_any_dir_rightclick = true;
+            do_asset_manager_menu_gui(&dir);
+            ImGui::EndPopup();
         }
 
         if (ImGui::BeginDragDropTarget()) {
@@ -602,10 +626,7 @@ module_scope {
             }
             ImGui::EndDragDropTarget();
         }
-
-        if (ImGui::IsItemClicked(1)) {
-            g_manager_menu_popup.should_open = true;
-        }
+        
 
         if (node_open) {	
             for (auto sub : dir.sub_directories) {
@@ -651,6 +672,12 @@ module_scope {
 
             do_dir_gui(*g_root_directory);
 
+            if (!g_any_dir_rightclick && ImGui::BeginPopupContextWindow("ooga booga")) {
+                do_asset_manager_menu_gui(g_root_directory);
+                ImGui::EndPopup();
+            }
+            g_any_dir_rightclick = false;
+
         }, ImGuiWindowFlags_MenuBar);
 
         ImGui::DoGuiWindow(&g_asset_inspector, [&]() {
@@ -667,7 +694,7 @@ module_scope {
 
                 if (ImGui::Button("Reload") && asset.in_memory) {
                     unload_from_memory(g_selected_asset);
-                    load_to_memory(g_selected_asset);
+                    asset.data_index = load_to_memory(g_selected_asset);
                 }
             }
 
@@ -700,6 +727,7 @@ module_scope {
             if (!assure((bool)spec.unload, "Asset loader must have valid unload() function")) return;
             if (!assure((bool)spec.set_default_params, "Asset loader must have valid set_default_params() function")) return;
             if (!assure(spec.param_size > 0, "Asset loader param size must be > 0")) return;
+            if (!assure(spec.runtime_data_size > 0, "Asset loader runtime data size must be > 0")) return;
             
             for (auto& loader : loaders) {
                 for (auto& ext : loader.extensions) {
@@ -710,6 +738,13 @@ module_scope {
             }
 
             loaders.emplace_back(spec);
+        };
+        lib.unregister_loader = [](str_ptr_t name) {
+            for (int i = (int)loaders.size() - 1; i >= 0; i--) {
+                if (strcmp(loaders[i].name, name) == 0) {
+                    loaders.erase(loaders.begin() + i);
+                }
+            }
         };
 
         return &lib;

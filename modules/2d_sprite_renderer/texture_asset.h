@@ -1,6 +1,13 @@
 #pragma once
 
-#include "2d_sprite_renderer.h"
+#include "apparatus.h"
+
+struct Texture_Data {
+	graphics_id_t graphics_id;
+	ivec2 size;
+	s32 channels;
+	void* data;
+};
 
 AP_NS_BEGIN(asset)
 AP_NS_BEGIN(texture)
@@ -13,9 +20,10 @@ struct Params {
 };
 
 constexpr size_t param_size = sizeof(Params);
+constexpr size_t runtime_data_size = sizeof(Texture_Data);
 constexpr Icon_Type icon = ICON_TYPE_TEXTURE;
 constexpr char name[] = "Texture";
-inline const Hash_Set<Dynamic_String> extensions = { "png", "jpg", "jpeg", "bmp", "psd" };
+inline const std::initializer_list<Dynamic_String> extensions = { "png", "jpg", "jpeg", "bmp", "psd" };
 
 size_t tell_size(str_ptr_t path, void* parameter);
 byte* load(byte* stream, str_ptr_t path, void* parameter);
@@ -25,7 +33,6 @@ void on_gui(void* parameter);
 
 void set_default_params(void* parameter);
 
-
-
 AP_NS_END(asset)
 AP_NS_END(texture)
+

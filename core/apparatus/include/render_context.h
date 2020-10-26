@@ -212,10 +212,12 @@ void main()
 		quads.clear();
 	}
 
-	inline void flush(const mz::fmat4& cam_transform, graphics_id_t render_target) {
+	inline void flush(const mz::fmat4& cam_transform, graphics_id_t render_target, f32 line_size = 2.f) {
 		if (!enable) return;
 
 		auto graphics = get_graphics();
+
+		graphics->set_line_size(line_size);
 
 		gizmo_render_context.data_ptr = gizmo_render_context.data;
 		u32 index_count = 0;
@@ -238,7 +240,6 @@ void main()
 
 		for (auto& quad : quads) {
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[0];
-			gizmo_render_context.data_ptr->pos.z = 999999;
 			gizmo_render_context.data_ptr->color = quad.color;
 			gizmo_render_context.data_ptr++;
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[1];
@@ -246,25 +247,20 @@ void main()
 			gizmo_render_context.data_ptr++;
 
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[1];
-			gizmo_render_context.data_ptr->pos.z = 999999;
 			gizmo_render_context.data_ptr->color = quad.color;
 			gizmo_render_context.data_ptr++;
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[2];
-			gizmo_render_context.data_ptr->pos.z = 999999;
 			gizmo_render_context.data_ptr->color = quad.color;
 			gizmo_render_context.data_ptr++;
 
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[2];
-			gizmo_render_context.data_ptr->pos.z = 999999;
 			gizmo_render_context.data_ptr->color = quad.color;
 			gizmo_render_context.data_ptr++;
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[3];
-			gizmo_render_context.data_ptr->pos.z = 999999;
 			gizmo_render_context.data_ptr->color = quad.color;
 			gizmo_render_context.data_ptr++;
 
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[3];
-			gizmo_render_context.data_ptr->pos.z = 999999;
 			gizmo_render_context.data_ptr->color = quad.color;
 			gizmo_render_context.data_ptr++;
 			gizmo_render_context.data_ptr->pos = quad.quad.ptr[0];

@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/test_module/test_module.h"
+#include "./test_module.h"
 
 #include <vector>
 #include <functional>
@@ -74,7 +74,7 @@ module_scope {
                         },
                         "hforce",
                         sizeof(f32),
-                        0,
+                        ap_offsetof(BallMovement, hforce),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -82,7 +82,7 @@ module_scope {
                         },
                         "jump_force",
                         sizeof(f32),
-                        sizeof(f32),
+                        ap_offsetof(BallMovement, jump_force),
                     },
                 }
             };
@@ -114,7 +114,68 @@ module_scope {
                         },
                         "move_speed",
                         sizeof(float),
-                        0,
+                        ap_offsetof(WASDMovement, move_speed),
+                    },
+                }
+            };
+        }
+        {
+            uintptr_t id = (uintptr_t)typeid(AnimatedWASDMovement).name();
+            runtime_ids.emplace(id);
+            name_id_map["AnimatedWASDMovement"] = id;
+            component_info[id] = {
+                [](entt::registry& reg, entt::entity entity) { 
+                    return &reg.emplace<AnimatedWASDMovement>(entity);
+                },
+                [](entt::registry& reg, entt::entity entity) { 
+                    if (!reg.has<AnimatedWASDMovement>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<AnimatedWASDMovement>(entity);
+                }, 
+                [](entt::registry& reg, entt::entity entity) { 
+                    reg.remove<AnimatedWASDMovement>(entity);
+                },
+            
+                "AnimatedWASDMovement",
+                id,
+                false,
+                sizeof(AnimatedWASDMovement),
+                std::vector<Property_Info> {
+                    Property_Info { 
+                        [](void* data) {
+                            do_gui<float>("hspeed", (float*)data);
+                        },
+                        "hspeed",
+                        sizeof(float),
+                        ap_offsetof(AnimatedWASDMovement, hspeed),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            do_gui<float>("vspeed", (float*)data);
+                        },
+                        "vspeed",
+                        sizeof(float),
+                        ap_offsetof(AnimatedWASDMovement, vspeed),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            ImGui::InputAsset("walk_right", (asset_id_t*)data, "SpriteAnimation2DPreset");                        },
+                        "walk_right",
+                        sizeof(asset_id_t),
+                        ap_offsetof(AnimatedWASDMovement, walk_right),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            ImGui::InputAsset("walk_up", (asset_id_t*)data, "SpriteAnimation2DPreset");                        },
+                        "walk_up",
+                        sizeof(asset_id_t),
+                        ap_offsetof(AnimatedWASDMovement, walk_up),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            ImGui::InputAsset("walk_down", (asset_id_t*)data, "SpriteAnimation2DPreset");                        },
+                        "walk_down",
+                        sizeof(asset_id_t),
+                        ap_offsetof(AnimatedWASDMovement, walk_down),
                     },
                 }
             };
@@ -160,5 +221,6 @@ module_scope {
     module_function(void) deinit() {
         entt::resolve<BallMovement>().reset();
         entt::resolve<WASDMovement>().reset();
+        entt::resolve<AnimatedWASDMovement>().reset();
     }
 }

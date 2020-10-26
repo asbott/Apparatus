@@ -178,6 +178,7 @@ struct AP_API Graphics_Context {
     virtual void set_culling(graphics_enum_t value) = 0;
     virtual void set_blending(bool value) = 0;
     virtual void set_depth_testing(bool value) = 0;
+    virtual void set_line_size(f32 sz) = 0;
 
     virtual graphics_id_t make_vertex_array(const Buffer_Layout_Specification& layout) = 0;
     virtual graphics_id_t make_shader_source(graphics_enum_t source_type, const char* src) = 0;
@@ -275,6 +276,9 @@ struct AP_API Graphics : public Graphics_Context {
     }
     _ap_force_inline void set_depth_testing(bool value) override {
         _thread_server->queue_task(_tid, [this, value]() { _inst.set_depth_testing(value); });
+    }
+    _ap_force_inline void set_line_size(f32 sz) override {
+        _thread_server->queue_task(_tid, [this, sz] { _inst.set_line_size(sz); });
     }
 
     _ap_force_inline graphics_id_t make_vertex_array(const Buffer_Layout_Specification& layout) override {
@@ -502,6 +506,7 @@ struct AP_API Graphics : public Graphics_Context {
 void set_culling(graphics_enum_t value);\
 void set_blending(bool value);\
 void set_depth_testing(bool value);\
+void set_line_size(f32 sz);\
 graphics_id_t make_vertex_array(const Buffer_Layout_Specification& layout);\
 graphics_id_t make_shader_source(graphics_enum_t source_type, const char* src);\
 graphics_id_t make_shader(graphics_id_t vert_shader, graphics_id_t frag_shader, const Buffer_Layout_Specification& input_layout);\

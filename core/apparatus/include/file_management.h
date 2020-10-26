@@ -32,6 +32,8 @@ namespace Path {
 
     AP_API void to_relative(str_ptr_t path, str_ptr_t base, char* out);
 
+    AP_API void to_canonical(str_ptr_t path, char* out);
+
     AP_API std::error_code copy(str_ptr_t src, str_ptr_t dst);
 
     AP_API void extension_of(str_ptr_t path, char* out);

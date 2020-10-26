@@ -97,7 +97,7 @@ struct Gui_Payload {
 	void* home;
 };
 
-
+typedef std::function<void(entt::registry& reg, entt::entity entity)> entity_preset_fn_t;
 
 #include "imgui_extension.h"
 
@@ -141,6 +141,9 @@ AP_API void unregister_gui_window(Gui_Window* wnd);
 
 AP_API void register_gui_popup(Gui_Popup* pop);
 AP_API void unregister_gui_popup(Gui_Popup* pop);
+
+AP_API void register_entity_preset(str_ptr_t name, const entity_preset_fn_t& preset_fn);
+AP_API void unregister_entity_preset(str_ptr_t name);
 
 AP_API void select_entity(entt::entity entity);
 AP_API void deselect_entity(entt::entity entity);

@@ -124,3 +124,5 @@
 #elif defined(_OS_LINUX)
 	#define MODULE_FILE_EXTENSION "so"
 #endif
+
+#define ap_offsetof(st, m) ((size_t)(&((st *)0)->m))

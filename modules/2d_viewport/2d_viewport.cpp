@@ -251,6 +251,15 @@ module_scope {
 		auto graphics = get_graphics();
 		graphics->set_culling(G_CULL_NONE);
 		graphics->set_blending(true);
+
+		register_entity_preset("Camera2D", [](entt::registry& reg, entt::entity entity) {
+			reg.emplace<Transform2D>(entity);
+			reg.emplace<View2D>(entity);
+		});
+
+		register_entity_preset("Empty", [](entt::registry& reg, entt::entity entity) {
+			reg.emplace<Transform2D>(entity);
+		});
 	}
 
 	module_function(void) on_unload() {
@@ -261,6 +270,9 @@ module_scope {
 		g_render_targets_to_destroy.clear();
 		
 		unregister_gui_window(&g_viewport);
+
+		unregister_entity_preset("Camera2D");
+		unregister_entity_preset("Empty");
 	}
 
 	module_function(void) on_play_begin() {

@@ -122,6 +122,11 @@ namespace Path {
         strcpy(out, rel.generic_string().c_str());
     }
 
+    void to_canonical(str_ptr_t path, char* out) {
+        fs::path canonical = fs::canonical(path);
+        strcpy(out, canonical.generic_string().c_str());
+    }
+
     std::error_code copy(str_ptr_t src, str_ptr_t dst) {
         fs::path srcp(src);
         fs::path dstp(dst);

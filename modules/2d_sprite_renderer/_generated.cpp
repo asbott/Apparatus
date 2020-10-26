@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/2d_sprite_renderer/2d_sprite_renderer.h"
+#include "./2d_sprite_renderer.h"
 
 #include <vector>
 #include <functional>
@@ -73,7 +73,7 @@ module_scope {
                             ImGui::InputAsset("texture", (asset_id_t*)data, "Texture");                        },
                         "texture",
                         sizeof(asset_id_t),
-                        0,
+                        ap_offsetof(Sprite2D, texture),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -81,7 +81,7 @@ module_scope {
                         },
                         "tint",
                         sizeof(color),
-                        sizeof(asset_id_t),
+                        ap_offsetof(Sprite2D, tint),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -89,7 +89,7 @@ module_scope {
                         },
                         "origin",
                         sizeof(fvec2),
-                        sizeof(asset_id_t)+sizeof(color),
+                        ap_offsetof(Sprite2D, origin),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -97,7 +97,7 @@ module_scope {
                         },
                         "depth_level",
                         sizeof(int),
-                        sizeof(asset_id_t)+sizeof(color)+sizeof(fvec2),
+                        ap_offsetof(Sprite2D, depth_level),
                     },
                 }
             };
@@ -120,23 +120,112 @@ module_scope {
             
                 "SpriteAnimation2D",
                 id,
-                false,
+                true,
                 sizeof(SpriteAnimation2D),
                 std::vector<Property_Info> {
                     Property_Info { 
                         [](void* data) {
-                            do_gui<bool>("use_asset", (bool*)data);
+                            on_gui((SpriteAnimation2D*)data);
                         },
-                        "use_asset",
+                        "is_playing",
                         sizeof(bool),
-                        0,
+                        ap_offsetof(SpriteAnimation2D, is_playing),
                     },
                     Property_Info { 
                         [](void* data) {
-                            ImGui::InputAsset("anim_asset", (asset_id_t*)data, "2");                        },
-                        "anim_asset",
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "depth_level",
+                        sizeof(int),
+                        ap_offsetof(SpriteAnimation2D, depth_level),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "origin",
+                        sizeof(fvec2),
+                        ap_offsetof(SpriteAnimation2D, origin),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "tint",
+                        sizeof(color16),
+                        ap_offsetof(SpriteAnimation2D, tint),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "animation_preset",
                         sizeof(asset_id_t),
+                        ap_offsetof(SpriteAnimation2D, animation_preset),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "texture_sheet",
+                        sizeof(asset_id_t),
+                        ap_offsetof(SpriteAnimation2D, texture_sheet),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "frames_per_second",
+                        sizeof(f32),
+                        ap_offsetof(SpriteAnimation2D, frames_per_second),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "target_frames",
+                        sizeof(irange),
+                        ap_offsetof(SpriteAnimation2D, target_frames),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "xflip",
                         sizeof(bool),
+                        ap_offsetof(SpriteAnimation2D, xflip),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "current_frame",
+                        sizeof(s32),
+                        ap_offsetof(SpriteAnimation2D, current_frame),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "time",
+                        sizeof(f32),
+                        ap_offsetof(SpriteAnimation2D, time),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "preview_frame",
+                        sizeof(s32),
+                        ap_offsetof(SpriteAnimation2D, preview_frame),
+                    },
+                    Property_Info { 
+                        [](void* data) {
+                            on_gui((SpriteAnimation2D*)data);
+                        },
+                        "preview_time",
+                        sizeof(f32),
+                        ap_offsetof(SpriteAnimation2D, preview_time),
                     },
                 }
             };

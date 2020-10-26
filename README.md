@@ -3,9 +3,26 @@ Modular game engine with fully native runtime gameplay
 programming.
 
 # Building
-After cloning the repo, make sure all git modules are initialized and updated:
-`git submodule update --init`
-<br>Then simply generate project files with premake5. From the repo directory, run: `premake5.exe vs2019` on windows or `./premake5 gmake2` on unix (replace `vs2019` and `gmake2` with whatever project manager you want).
+
+1. Clone the repo
+    
+    `git clone https://github.com/asbott/Apparatus my_repo_dir`
+2. Initialize and update submodules
+    
+    `git submodule update --init`
+3. Generate project files
+    - Windows, Visual Studio 2019: 
+        
+        `premake5.exe vs2019`
+    - Unix, makefiles: 
+    
+        `./premake5 gmake2`
+4. Build the <i>parser</i> project
+    - With Visual Studio 2019: Right click the <i>parser</i> project and hit <i>build</i>
+    - With makefiles & make: 
+
+        `make parser`
+
 
 Apparatus should be fully functional on Linux systems using x11. Has been tested with Manjaro 20.1.2, compiling with g++ 10.2.0.
 

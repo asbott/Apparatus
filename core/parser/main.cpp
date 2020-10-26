@@ -454,10 +454,8 @@ int main(int argc, char** argv) {
 
             std::string word;
             while (file_stream >> word) {
-                std::cout << word << "\n";
                 if (word.find("tag") == 0) {
                     files.emplace(file_path);
-                    std::cout << file_path << "\n";
                     output_stream << "#include \"" << file_path << "\"\n";
                     break;
                 }
@@ -604,7 +602,6 @@ module_scope {
                         done(-1);
                     }
                     if (token.is(Token::Kind::Identifier)) {
-                        std::cout << "\nFound tag '" << token.lexeme() << "'\n";
 
                         bool is_args = false;
                         auto next = lex.next();
@@ -615,21 +612,27 @@ module_scope {
                             bool in_str = false;
                             next = lex.next();
                             while (!next.is(Token::Kind::RightParen)) {
-                                if (next.is(Token::Kind::SingleQuote) && !in_str) {
+                                std::cout << next.lexeme() << " (" << next.kind() << "), " << Token::Kind::SingleQuote << ", " << Token::Kind::DoubleQuote << "\n";
+                                if (next.is(Token::Kind::DoubleQuote) && !in_str) {
+                                    std::cout << next.lexeme() << " is an opening single quote\n";
                                     in_str = true;
                                     next = lex.next();
                                 }
-                                if (next.is(Token::Kind::SingleQuote) && in_str) {
+                                if (next.is(Token::Kind::DoubleQuote) && in_str) {
+                                    std::cout << next.lexeme() << " is a closing single quote\n";
                                     in_str = false;
+                                    std::cout << "found string arg: " << str_arg << "\n";
                                     args.emplace(str_arg);
                                     str_arg = "";
                                     next = lex.next();
                                 }
 
                                 if (next.is(Token::Kind::Identifier) || next.is(Token::Kind::Number)) {
+                                    std::cout << next.lexeme() << " , " << in_str << "\n";
                                     if (in_str) {
                                         str_arg += next.lexeme();
-                                    } else {
+                                    } else { 
+                                        std::cout << "Found arg (single token): " << next.lexeme() << "\n";
                                         args.emplace(next.lexeme());
                                     }
                                 }
@@ -660,7 +663,6 @@ module_scope {
                 item.name = token.lexeme();
 
                 tags.clear();
-                std::cout << "\nFound struct '" << item.name << "'\n";
                 in_struct = true;
                 structs.push_back(item);
             }
@@ -683,7 +685,6 @@ module_scope {
                     item.name = second.lexeme();
                     item.tags = tags;
                     tags.clear();
-                    std::cout << "\nFound member '" << item.name << "'\n";
                     struct_item.members.push_back(item);
                 }
             }
@@ -717,15 +718,9 @@ module_scope {
                 output_stream << "                sizeof(" << struct_item.name << "),\n";
 
                 output_stream << "                std::vector<Property_Info> {\n";
-                std::vector<std::string> sizeofs;
                 for (auto& member : struct_item.members) {
-                    std::cout << "\n" << member.name << "\n";
                     std::string this_sizeof = "sizeof(" + member.property_type + ")";
                     if (member.tags.find(Tag("property")) != member.tags.end() || struct_item.tags.find(Tag("custom_gui")) != struct_item.tags.end()) {
-                        std::string this_offset = "";
-                        for (auto& asizeof : sizeofs) this_offset += asizeof+ + "+";
-                        if (this_offset.size() > 1) this_offset.pop_back();
-                        if (this_offset == "") this_offset = "0";
                         output_stream << "                    Property_Info { \n";
                         output_stream << "                        [](void* data) {\n";
 
@@ -747,12 +742,11 @@ module_scope {
                         output_stream << "                        },\n";
                         output_stream << "                        \"" << member.name << "\",\n";
                         output_stream << "                        " << this_sizeof << ",\n";
-                        output_stream << "                        " << this_offset << ",\n";
+                        output_stream << "                        ap_offsetof(" << struct_item.name << ", " << member.name << "),\n";
                         output_stream << "                    },\n";
 
 
                     }
-                    sizeofs.push_back(this_sizeof);
                 }
                 output_stream << "                }\n";
                 output_stream << "            };\n";

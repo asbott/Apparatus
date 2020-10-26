@@ -72,37 +72,53 @@ frect calculate_view_rect(fvec2 resolution) {
 	return frect(pos, sz);
 }
 
-fquad get_selection_by_sprite(entt::registry& reg, entt::entity entity, Transform2D& transform) {
+fquad get_selection_by_sprite(Transform2D& transform, fvec2 size, fvec2 origin) {
+	fmat4 matrix = transform.to_mat4();
+	matrix.translate(-origin);
+	auto selection_quad = fquad(
+		matrix * fvec4(fvec2(0.f,    0.f), 1, 1),
+		matrix * fvec4(fvec2(0.f,    size.y), 1, 1),
+		matrix * fvec4(fvec2(size.x, size.y), 1, 1),
+		matrix * fvec4(fvec2(size.x, 0.f), 1, 1)
+	);
+
+
+	return selection_quad;
+}
+
+fquad get_selection_quad(entt::registry& reg, entt::entity entity, Transform2D& transform) {
+
+	fquad selection_quad(0);
+
 	if (reg.has<Sprite2D>(entity)) {
 		auto& sprite = reg.get<Sprite2D>(entity);
 
 		if (g_asset_module && g_asset_manager->validate(&sprite.texture)) {
 			if (Asset* asset = g_asset_manager->begin_use(sprite.texture)) {
-				if (!asset->is("Texture")) return fquad(0);
-				auto* texture_data = (Texture_Data*)asset->get_runtime_data();
-				fvec2 size = texture_data->size;
-
-				fmat4 matrix = transform.to_mat4();
-				matrix.translate(-sprite.origin);
-				auto selection_quad = fquad(
-					matrix * fvec4(fvec2(0.f,    0.f), 1, 1),
-					matrix * fvec4(fvec2(0.f,    size.y), 1, 1),
-					matrix * fvec4(fvec2(size.x, size.y), 1, 1),
-					matrix * fvec4(fvec2(size.x, 0.f), 1, 1)
-				);
-
+				if (!asset->is("Texture")) {
+					g_asset_manager->end_use(sprite.texture);
+					return fquad(0);
+				}
+				auto* texture_data = asset->get_runtime_data<Texture_Data>();
+				selection_quad = get_selection_by_sprite(transform, texture_data->size, sprite.origin);
 				g_asset_manager->end_use(sprite.texture);
-
-				return selection_quad;
 			}
 		}
 	}
-	return fquad(0);
-}
 
-fquad get_selection_quad(entt::registry& reg, entt::entity entity, Transform2D& transform) {
+	if (selection_quad == fquad(0) && reg.has<SpriteAnimation2D>(entity)) {
+		auto& anim = reg.get<SpriteAnimation2D>(entity);
 
-	fquad selection_quad = get_selection_by_sprite(reg, entity, transform);
+		Texture_Sheet_Runtime_Data sheet_data;
+		if (g_asset_module && g_asset_module->is_loaded && anim.get_sheet_data(&sheet_data) && g_asset_manager->validate(&sheet_data.texture)) {
+			Asset* texture_asset = g_asset_manager->begin_use(sheet_data.texture);
+			if (texture_asset && texture_asset->is("Texture")) {
+				auto* texture_data = texture_asset->get_runtime_data<Texture_Data>();
+				selection_quad = get_selection_by_sprite(transform, sheet_data.cell_size, anim.origin);
+			}
+			if (texture_asset) g_asset_manager->end_use(sheet_data.texture);
+		}
+	}
 	
 	if (selection_quad == fquad(0) && reg.has<CollisionShape2D>(entity)) {
 		auto& shape = reg.get<CollisionShape2D>(entity);

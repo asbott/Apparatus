@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/2d_tilemap_renderer/2d_tilemap_renderer.h"
+#include "./2d_tilemap_renderer.h"
 
 #include <vector>
 #include <functional>
@@ -73,7 +73,7 @@ module_scope {
                             ImGui::InputAsset("source_texture", (asset_id_t*)data, "Texture");                        },
                         "source_texture",
                         sizeof(asset_id_t),
-                        0,
+                        ap_offsetof(TileMap2D, source_texture),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -81,7 +81,7 @@ module_scope {
                         },
                         "tile_size",
                         sizeof(fvec2),
-                        sizeof(asset_id_t),
+                        ap_offsetof(TileMap2D, tile_size),
                     },
                 }
             };

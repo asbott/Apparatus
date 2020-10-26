@@ -48,6 +48,12 @@ struct Component_Reference {
     Module* mod = NULL;
 };
 
+struct Entity_Preset {
+    Entity_Preset(str_ptr_t name, entity_preset_fn_t fn) : name(name), fn(fn) {}
+    str_ptr_t name;
+    entity_preset_fn_t fn;
+};
+
 Component_Reference component_clipboard;
 
 Graphics_Context* g_graphics;
@@ -94,6 +100,10 @@ path_str_t g_browse_dir = "";
 File_Browser_Mode g_browse_mode;
 
 Dynamic_Array<std::function<void()>> g_deferred_functions;
+
+Dynamic_Array<Entity_Preset> g_entity_presets;
+
+Dynamic_Array<entt::entity> g_entities_to_remove;
 
 namespace ImGui {
 	void Icon(Icon_Type icon, mz::ivec2 size) {
@@ -148,6 +158,17 @@ void register_gui_popup(Gui_Popup* pop) {
 
 void unregister_gui_popup(Gui_Popup* pop) {
     gui_popups.erase(pop);
+}
+
+void register_entity_preset(str_ptr_t name, const entity_preset_fn_t& preset_fn) {
+    g_entity_presets.emplace_back(name, preset_fn );
+}
+void unregister_entity_preset(str_ptr_t name) {
+    for (int i = (int)g_entity_presets.size() - 1; i >= 0; i--) {
+        if (strcmp(g_entity_presets[i].name, name)) {
+            g_entity_presets.erase(g_entity_presets.begin() + i);
+        }
+    }
 }
 
 void load_icon(Icon_Type type, str_ptr_t dir, str_ptr_t offset_path) {
@@ -319,7 +340,7 @@ void from_file(entt::registry& reg, str_ptr_t dir_path) {
 
                     Module* comp_mod = get_module(mod_str_id);
 
-                    if (!comp_mod) {
+                    if (!comp_mod || !comp_mod->is_loaded) {
                         log_error("Component '{}' on entity '{}' could not be loaded because no registered module with str_id '{}' was found",
                                    comp_name, entity_name, mod_str_id);
                         continue;
@@ -348,8 +369,9 @@ void from_file(entt::registry& reg, str_ptr_t dir_path) {
                             if (strcmp(prop.name.c_str(), id) == 0) {
                                 size_t actual_size = 0;
                                 auto data = comp_archive.read(id, &actual_size);
-                                if (actual_size > prop.size) actual_size = prop.size;
-                                memcpy((byte*)comp + prop.offset, data, actual_size);
+                                if (actual_size == prop.size) {
+                                    memcpy((byte*)comp + prop.offset, data, actual_size);
+                                }
                             } 
                         }
 
@@ -537,7 +559,7 @@ void do_file_browser_gui() {
     ImGui::EndMenuBar();
 
     Path::iterate_directories(g_browse_dir, [](str_ptr_t path) {
-        if (!Path::can_open(path)){
+        if (Path::is_directory(path)){
             path_str_t dir_name = "";
             path_str_t ext = "";
             Path::extension_of(path, ext);
@@ -558,7 +580,7 @@ void do_file_browser_gui() {
     });
 
     Path::iterate_directories(g_browse_dir, [](str_ptr_t path) {
-        if (Path::can_open(path) && g_browse_mode != File_Browser_Mode::directory) {
+        if (Path::is_file(path) && g_browse_mode != File_Browser_Mode::directory) {
             path_str_t file_name = "";
             path_str_t ext = "";
             Path::extension_of(path, ext);
@@ -662,7 +684,50 @@ void load_project(str_ptr_t new_dir) {
     ImGui::LoadStyleFromDisk(g_style_path);
 }
 
+void do_entity_management_gui() {
+    if (ImGui::BeginMenu("Create")) {
 
+        static str_t<128> buf;
+
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue
+                                  | ImGuiInputTextFlags_CallbackCharFilter;
+
+        entt::entity entity = entt::null;
+
+        bool create = false;
+
+        ImGui::RInputText("Name", buf, sizeof(buf), flags, ImGui::Filters::AlphaNumeric);
+
+        ImGui::Separator();
+
+        for (const auto& entity_preset : g_entity_presets) {
+            if (ImGui::MenuItem(entity_preset.name, 0, false, strlen(buf))) {
+                entity = g_reg.create();
+                entity_preset.fn(g_reg, entity);
+                create = true;
+                break;
+            }
+        }
+
+        if (create) {
+            g_reg.emplace<Entity_Info>(entity);
+            g_reg.get<Entity_Info>(entity).id = entity;
+            strcpy(g_reg.get<Entity_Info>(entity).name, buf);
+            strcpy(buf, "");
+        }
+
+        if (ImGui::IsKeyReleased(AP_KEY_ENTER)) ImGui::CloseCurrentPopup();
+
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::MenuItem("Remove", "del", false, g_selected_entities.size() > 0) || ImGui::IsKeyPressed(AP_KEY_DELETE)) {
+        for (auto entity : g_selected_entities) {
+            g_entities_to_remove.push_back(entity);
+        }
+        deselect_all_entities();
+    }
+}
 
 int start(int argc, char** argv) {
     (void)argc;
@@ -1089,35 +1154,12 @@ int start(int argc, char** argv) {
         ImGui::EndMainMenuBar();
 
         ImGui::DoGuiWindow(&scene_inspector, [&]() {
+
             ImGui::BeginMenuBar();
-            if (ImGui::BeginMenu("Create")) {
-
-                static str_t<128> buf;
-
-                ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue
-                                          | ImGuiInputTextFlags_CallbackCharFilter;
-                if (ImGui::RInputText("Name", buf, sizeof(buf), flags, ImGui::Filters::AlphaNumeric) || ImGui::MenuItem("Create") && strlen(buf)) {
-                    auto entity = g_reg.create();
-                    g_reg.emplace<Entity_Info>(entity);
-                    g_reg.get<Entity_Info>(entity).id = entity;
-                    strcpy(g_reg.get<Entity_Info>(entity).name, buf);
-                    strcpy(buf, "");
-                }
-
-                if (ImGui::IsKeyReleased(AP_KEY_ENTER)) ImGui::CloseCurrentPopup();
-
-                ImGui::EndMenu();
-            }
-
-            if (ImGui::MenuItem("Remove", "del", false, g_selected_entities.size() > 0) || ImGui::IsKeyPressed(AP_KEY_DELETE)) {
-                for (auto entity : g_selected_entities) {
-                    g_reg.destroy(entity);
-                }
-                deselect_all_entities();
-            }
+            do_entity_management_gui();
             ImGui::EndMenuBar();
 
-            bool any_clicked = false;
+            bool any_item_popup = false;
             g_reg.view<Entity_Info>().each([&](entt::entity entity, Entity_Info& entity_info) {
                 char label[256] = "";
                 sprintf(label, "%s##%i", entity_info.name, entity_info.id);
@@ -1127,11 +1169,25 @@ int start(int argc, char** argv) {
                         deselect_all_entities();
                     }
                     select_entity(entity);
-                    any_clicked = true;
                 }
+
+                ImGui::PushID((int)entity);
+                if (ImGui::BeginPopupContextItem("")) {
+                    any_item_popup = true;
+                    if (ImGui::MenuItem("Remove")) {
+                        g_entities_to_remove.push_back(entity);
+                    }
+                    ImGui::EndPopup();
+                }
+                ImGui::PopID();
             });
 
-            if (ImGui::IsMouseClicked(0) && !any_clicked && ImGui::IsWindowHovered()) {
+            if (!any_item_popup && ImGui::BeginPopupContextWindow("scene_inspector")) {
+                do_entity_management_gui();
+                ImGui::EndPopup();
+            }
+
+            if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered()) {
                 deselect_all_entities();
             }
         }, ImGuiWindowFlags_MenuBar);
@@ -1139,6 +1195,10 @@ int start(int argc, char** argv) {
         ImGui::DoGuiWindow(&entity_inspector, [&]() {
             for (auto selected_entity : g_selected_entities) {
                 if (g_reg.valid(selected_entity)) {
+                    auto& entity_info = g_reg.get<Entity_Info>(selected_entity);
+                    ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue
+                                    | ImGuiInputTextFlags_CallbackCharFilter;
+                    ImGui::RInputText("Name", entity_info.name, sizeof(entity_info.name), flags, ImGui::Filters::AlphaNumeric);
                     ImGui::Separator();
                     for (auto* mod : g_modules) {
                         if (!mod->is_loaded) continue;
@@ -1396,6 +1456,14 @@ int start(int argc, char** argv) {
             unload_module(mod);
         }
         to_unload.clear();
+
+        for (auto to_remove : g_entities_to_remove) {
+            if (is_entity_selected(to_remove)) {
+                deselect_entity(to_remove);
+            }
+            g_reg.destroy(to_remove);
+        }
+        g_entities_to_remove.clear();
     }
 
     shutdown_dependencies();

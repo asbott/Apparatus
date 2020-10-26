@@ -21,7 +21,7 @@ Binary_Archive::Binary_Archive(str_ptr_t file_path, size_t hint_size) : file_pat
 
         for (int i = (int)buffer.size() - 1; i >= 0; i--) {
             if (i + 1 < buffer.size() && buffer[i] == '\r' && buffer[i + 1] == '\n') {
-                buffer.erase(buffer.begin() + i);
+                buffer.erase(buffer.begin() + i);  
             }
         }
 

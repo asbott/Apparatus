@@ -1,5 +1,7 @@
 #include "texture_asset.h"
 
+#include "asset_manager/asset_manager.h"
+
 AP_NS_BEGIN(asset)
 AP_NS_BEGIN(texture)
 

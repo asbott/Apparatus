@@ -57,6 +57,34 @@ module_scope {
 				transform.position += fvec2(1, 0) * movement.move_speed * delta;
 			}
 		});
+
+		reg.view<Transform2D, AnimatedWASDMovement, SpriteAnimation2D>().each([delta](Transform2D& transform, AnimatedWASDMovement& movement, SpriteAnimation2D& anim) {
+			fvec2 dir = 0;
+			if (game_input()->is_key_down(AP_KEY_W)) {
+				dir = fvec2(0, 1);
+			}
+			if (game_input()->is_key_down(AP_KEY_A)) {
+				anim.xflip = true;
+				dir = fvec2(-1, 0);
+			}
+			if (game_input()->is_key_down(AP_KEY_S)) {
+				dir = fvec2(0, -1);
+			}
+			if (game_input()->is_key_down(AP_KEY_D)) {
+				anim.xflip = false;
+				dir = fvec2(1, 0);
+			}
+
+			if (dir.x == 1 || dir.x == -1) {
+				anim.animation_preset = movement.walk_right;
+			} else if (dir.y == 1) {
+				anim.animation_preset = movement.walk_up;
+			} else if (dir.y == -1) {
+				anim.animation_preset = movement.walk_down;
+			}
+
+			transform.position += dir * fvec2(movement.hspeed * delta, movement.vspeed * delta);
+		});
     }
 
 	module_function(void) on_render() {

@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/2d_viewport/2d_viewport.h"
+#include "./2d_viewport.h"
 
 #include <vector>
 #include <functional>
@@ -74,7 +74,7 @@ module_scope {
                         },
                         "clear_color",
                         sizeof(color16),
-                        0,
+                        ap_offsetof(View2D, clear_color),
                     },
                 }
             };
@@ -106,7 +106,7 @@ module_scope {
                         },
                         "position",
                         sizeof(fvec2),
-                        0,
+                        ap_offsetof(Transform2D, position),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -114,7 +114,7 @@ module_scope {
                         },
                         "rotation",
                         sizeof(f32),
-                        sizeof(fvec2),
+                        ap_offsetof(Transform2D, rotation),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -122,7 +122,7 @@ module_scope {
                         },
                         "scale",
                         sizeof(fvec2),
-                        sizeof(fvec2)+sizeof(f32),
+                        ap_offsetof(Transform2D, scale),
                     },
                 }
             };

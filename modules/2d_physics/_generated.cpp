@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/2d_physics/2d_physics.h"
+#include "./2d_physics.h"
 
 #include <vector>
 #include <functional>
@@ -74,7 +74,7 @@ module_scope {
                         },
                         "friction",
                         sizeof(f32),
-                        0,
+                        ap_offsetof(PhysicsBody2D, friction),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -82,7 +82,7 @@ module_scope {
                         },
                         "density",
                         sizeof(f32),
-                        sizeof(f32),
+                        ap_offsetof(PhysicsBody2D, density),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -90,7 +90,7 @@ module_scope {
                         },
                         "restitution",
                         sizeof(f32),
-                        sizeof(f32)+sizeof(f32),
+                        ap_offsetof(PhysicsBody2D, restitution),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -98,7 +98,7 @@ module_scope {
                         },
                         "velocity",
                         sizeof(fvec2),
-                        sizeof(f32)+sizeof(f32)+sizeof(f32),
+                        ap_offsetof(PhysicsBody2D, velocity),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -106,7 +106,7 @@ module_scope {
                         },
                         "body_type",
                         sizeof(Physics_Body_Type),
-                        sizeof(f32)+sizeof(f32)+sizeof(f32)+sizeof(fvec2),
+                        ap_offsetof(PhysicsBody2D, body_type),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -114,7 +114,7 @@ module_scope {
                         },
                         "on_contact_begin",
                         sizeof(collision_callback_t),
-                        sizeof(f32)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(Physics_Body_Type),
+                        ap_offsetof(PhysicsBody2D, on_contact_begin),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -122,7 +122,7 @@ module_scope {
                         },
                         "on_contact_end",
                         sizeof(collision_callback_t),
-                        sizeof(f32)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(Physics_Body_Type)+sizeof(collision_callback_t),
+                        ap_offsetof(PhysicsBody2D, on_contact_end),
                     },
                 }
             };
@@ -154,7 +154,7 @@ module_scope {
                         },
                         "offset",
                         sizeof(fvec2),
-                        0,
+                        ap_offsetof(CollisionShape2D, offset),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -162,7 +162,7 @@ module_scope {
                         },
                         "is_trigger",
                         sizeof(bool),
-                        sizeof(fvec2),
+                        ap_offsetof(CollisionShape2D, is_trigger),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -170,7 +170,7 @@ module_scope {
                         },
                         "half_extents",
                         sizeof(fvec2),
-                        sizeof(fvec2)+sizeof(bool),
+                        ap_offsetof(CollisionShape2D, half_extents),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -178,7 +178,7 @@ module_scope {
                         },
                         "shape_type",
                         sizeof(Collision_Shape_Type_2D),
-                        sizeof(fvec2)+sizeof(bool)+sizeof(fvec2),
+                        ap_offsetof(CollisionShape2D, shape_type),
                     },
                 }
             };

@@ -1,5 +1,5 @@
 #include "apparatus.h"
-#include "D:/dev/Apparatus/modules/2d_particles_simulator/2d_particles_simulator.h"
+#include "./2d_particles_simulator.h"
 
 #include <vector>
 #include <functional>
@@ -74,7 +74,7 @@ module_scope {
                         },
                         "type",
                         sizeof(Particle_Type),
-                        0,
+                        ap_offsetof(ParticleSimulation2D, type),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -82,7 +82,7 @@ module_scope {
                         },
                         "loop",
                         sizeof(bool),
-                        sizeof(Particle_Type),
+                        ap_offsetof(ParticleSimulation2D, loop),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -90,7 +90,7 @@ module_scope {
                         },
                         "duration",
                         sizeof(f32),
-                        sizeof(Particle_Type)+sizeof(bool),
+                        ap_offsetof(ParticleSimulation2D, duration),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -98,7 +98,7 @@ module_scope {
                         },
                         "spawn_rate",
                         sizeof(f32),
-                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32),
+                        ap_offsetof(ParticleSimulation2D, spawn_rate),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -106,7 +106,7 @@ module_scope {
                         },
                         "angle_range",
                         sizeof(fvec2),
-                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32),
+                        ap_offsetof(ParticleSimulation2D, angle_range),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -114,7 +114,7 @@ module_scope {
                         },
                         "speed_range",
                         sizeof(fvec2),
-                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2),
+                        ap_offsetof(ParticleSimulation2D, speed_range),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -122,7 +122,7 @@ module_scope {
                         },
                         "life_time",
                         sizeof(f32),
-                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(fvec2),
+                        ap_offsetof(ParticleSimulation2D, life_time),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -130,7 +130,7 @@ module_scope {
                         },
                         "preview_in_editor",
                         sizeof(bool),
-                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(fvec2)+sizeof(f32),
+                        ap_offsetof(ParticleSimulation2D, preview_in_editor),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -138,7 +138,7 @@ module_scope {
                         },
                         "play_on_start",
                         sizeof(bool),
-                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(fvec2)+sizeof(f32)+sizeof(bool),
+                        ap_offsetof(ParticleSimulation2D, play_on_start),
                     },
                     Property_Info { 
                         [](void* data) {
@@ -146,7 +146,7 @@ module_scope {
                         },
                         "state",
                         sizeof(Particle_Simulation_State),
-                        sizeof(Particle_Type)+sizeof(bool)+sizeof(f32)+sizeof(f32)+sizeof(fvec2)+sizeof(fvec2)+sizeof(f32)+sizeof(bool)+sizeof(bool),
+                        ap_offsetof(ParticleSimulation2D, state),
                     },
                 }
             };
