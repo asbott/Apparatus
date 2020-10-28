@@ -31,7 +31,7 @@ void do_gui(const std::string& name, type_t* data) {
     } else if constexpr (std::is_same<type_t, f32>()) {
         ImGui::RDragFloat(label.c_str(), (f32*)data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec2>()) {
-        ImGui::RDragFloat2(label.c_str(), (f32*)data, 0.1f);
+        ImGui::RDragFvec2(label.c_str(), data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec3>()) {
         ImGui::RDragFloat3(label.c_str(), (f32*)data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec4>()) {

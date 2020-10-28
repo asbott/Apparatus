@@ -1289,17 +1289,17 @@ int start(int argc, char** argv) {
             auto& ext_style = ImGui::GetExtensionStyle();
 
             ImGui::Text("Padding");
-            ImGui::RDragFloat2("Window padding", (float*)&style.WindowPadding, .05f);
-            ImGui::RDragFloat2("Frame padding", (float*)&style.FramePadding, .05f);
-            ImGui::RDragFloat2("Touch extra padding", (float*)&style.TouchExtraPadding, .05f);
-            ImGui::RDragFloat2("Display window padding", (float*)&style.DisplayWindowPadding, .05f);
-            ImGui::RDragFloat2("Display safe area padding", (float*)&style.DisplaySafeAreaPadding, .05f);
-            ImGui::RDragFloat2("Item padding", (float*)&style.ItemSpacing, .05f);
-            ImGui::RDragFloat2("Item inner padding", (float*)&style.ItemInnerSpacing, .05f);
+            ImGui::RDragFvec2("Window padding", &(fvec2)style.WindowPadding, .05f);
+            ImGui::RDragFvec2("Frame padding", &(fvec2)style.FramePadding, .05f);
+            ImGui::RDragFvec2("Touch extra padding", &(fvec2)style.TouchExtraPadding, .05f);
+            ImGui::RDragFvec2("Display window padding", &(fvec2)style.DisplayWindowPadding, .05f);
+            ImGui::RDragFvec2("Display safe area padding", &(fvec2)style.DisplaySafeAreaPadding, .05f);
+            ImGui::RDragFvec2("Item padding", &(fvec2)style.ItemSpacing, .05f);
+            ImGui::RDragFvec2("Item inner padding", &(fvec2)style.ItemInnerSpacing, .05f);
             ImGui::RDragFloat("Indent padding", &style.IndentSpacing, .05f);
             ImGui::RDragFloat("Columns min padding", &style.ColumnsMinSpacing, .05f);
             ImGui::RSliderFloat("Right align padding", &ext_style.right_align_padding, .01f, 1.f);
-            ImGui::RDragFloat2("Button min padding", ext_style.min_button_padding.ptr, .05f);
+            ImGui::RDragFvec2("Button min padding", &(fvec2)ext_style.min_button_padding, .05f);
 
             ImGui::Spacing();
             ImGui::Text("Border toggles");
@@ -1330,9 +1330,11 @@ int start(int argc, char** argv) {
                 style.FrameBorderSize = (f32)borders;
             }
 
+            
+
             ImGui::Spacing();
             ImGui::Text("Size");
-            ImGui::RDragFloat2("Window min size", (float*)&style.WindowMinSize, .05f, .1f, 20000.f);
+            ImGui::RDragFvec2("Window min size", (fvec2*)&style.WindowMinSize, .05f, .1f, 20000.f);
             ImGui::RDragFloat("Scrollbar size", &style.ScrollbarSize, .1f, .1f, 1000.f);
             ImGui::RDragFloat("Grab min size", &style.GrabMinSize, .1f, .1f, 1000.f);
             ImGui::RDragFloat("Tab min width for close button", &style.TabMinWidthForCloseButton);

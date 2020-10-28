@@ -96,7 +96,7 @@ inline void on_gui(PhysicsBody2D* body) {
     }
 
     if (body->body_type == BODY_TYPE_DYNAMIC) {
-        ImGui::RDragFloat2("Velocity", body->velocity.ptr, .1f);
+        ImGui::RDragFvec2("Velocity", &body->velocity, .1f);
         ImGui::RDragFloat("Friction", &body->friction, .01f, 0.f, 1.f);
         ImGui::RDragFloat("Density", &body->density, .01f, 0.f, 100000.f);
         ImGui::RDragFloat("Restitution", &body->restitution, .01f, 0.f, 1.f);
@@ -104,7 +104,7 @@ inline void on_gui(PhysicsBody2D* body) {
 }
 
 inline void on_gui(CollisionShape2D* shape) {
-    ImGui::RDragFloat2("Offset", shape->offset.ptr, .1f);
+    ImGui::RDragFvec2("Offset", &shape->offset, .1f);
     ImGui::RCheckbox("Is trigger", &shape->is_trigger);
 
     if (ImGui::RBeginCombo("Shape type", shape_type_str(shape->shape_type))) {
@@ -119,7 +119,7 @@ inline void on_gui(CollisionShape2D* shape) {
 
     switch (shape->shape_type) {
     case SHAPE_2D_RECT:
-        ImGui::RDragFloat2("Half-extents", shape->half_extents.ptr, .1f, .001f, 99999999999999.f);
+        ImGui::RDragFvec2("Half-extents", &shape->half_extents, .1f, .001f, 99999999999999.f);
         break;
     case SHAPE_2D_CIRCLE:
         ImGui::RDragFloat("Radius", shape->half_extents.ptr, .1f, .001f, 99999999999999.f);

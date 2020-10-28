@@ -4,6 +4,8 @@
 
 #include "asset_manager.h"
 
+void delete_asset(asset_id_t id);
+
 struct Asset_Directory {
     Asset_Directory(Asset_Directory* parent, str_ptr_t path) 
         : parent_directory(parent) {
@@ -34,6 +36,30 @@ struct Asset_Directory {
             delete sub_dir;
         }
         sub_directories.clear();
+    }
+
+    void delete_sub_dir(str_ptr_t real_path) {
+        Asset_Directory* sub_dir = NULL;
+        int idx = 0;
+        for (int i = 0; i < (int)sub_directories.size(); i++) {
+            if (Path::equals(sub_directories[i]->real_path, real_path) == 0) {
+                sub_dir = sub_directories[i];
+                idx = i;
+                break;
+            }
+        }
+
+        if (!sub_dir) return;
+
+        for (auto aid : sub_dir->assets) {
+            delete_asset(aid);
+        }
+
+        sub_dir->clear();
+
+        delete sub_dir;
+
+        sub_directories.erase(sub_directories.begin() + idx);
     }
 };
 
@@ -97,6 +123,8 @@ Hash_Set<u32> taken_uids;
 
 bool g_any_dir_rightclick = false;
 
+// #Optimize
+//     Should probably do bit shifting here...
 u32 get_index(asset_id_t id) {
     u32 idx = 0;
     memcpy(&idx, &id, 4);
@@ -278,6 +306,8 @@ void delete_asset(asset_id_t id) {
 
     free(asset.load_param);
     asset.load_param = NULL;
+
+    asset.is_garbage = true;
 }
 
 Asset* begin_use(asset_id_t id) {
@@ -365,6 +395,10 @@ void do_asset_manager_menu_gui(Asset_Directory* dir) {
             }
         });
     }
+
+    if (ImGui::MenuItem("Delete")) {
+        dir->parent_directory->delete_sub_dir(dir->real_path);
+    }
 }
 
 void clear_assets() {
@@ -438,6 +472,14 @@ module_scope {
         strcpy(g_current_dir, get_executable_directory());
     }
 
+    module_function(void) on_play_begin() {
+        
+    }
+
+    module_function(void) on_play_stop() {
+        
+    }
+
     module_function(void) save_to_disk(str_ptr_t dir) {
         (void)dir;
 
@@ -455,6 +497,7 @@ module_scope {
 
         // Write all meta files
         for (auto& asset : assets) {
+            if (asset.is_garbage) continue;
             Binary_Archive params_archive(asset.meta_path);
 
             auto& loader = loaders[asset.loader];

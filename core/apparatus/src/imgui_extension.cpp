@@ -145,6 +145,125 @@ namespace ImGui {
         PopID();
         return ret;
     }
+
+    bool RDragFvec2(const char* label, mz::fvec2* v, float v_speed, float v_min, float v_max, const char* format, ImGuiSliderFlags flags) {
+        f32 right_offset = GetWindowWidth() * g_ext_style.right_align;
+        AlignTextToFramePadding();
+        Text("%s", label); 
+        if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", label);
+        }
+        auto wnd = ImGui::GetCurrentWindow();
+        if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
+            SameLine();
+        } else {
+            SameLine(right_offset - ImGui::GetStyle().ItemSpacing.x * 2.f);
+        }
+        f32 item_width = GetWindowWidth() - right_offset - GetWindowWidth() * g_ext_style.right_align_padding;
+        f32 labelx_width = ImGui::CalcTextSize("X").x;
+        f32 labely_width = ImGui::CalcTextSize("Y").x;
+        f32 width_for_fields = item_width - (labelx_width + labely_width);
+        f32 width_per_field = width_for_fields / 2.f - ImGui::GetStyle().ItemSpacing.x / 2.f;
+
+        ImGui::PushID(v);
+        ImGui::Text("X");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesx = DragFloat("##x", &v->x, v_speed, v_min, v_max, format, flags);
+        ImGui::SameLine();
+        ImGui::Text("Y");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesy = DragFloat("##y", &v->y, v_speed, v_min, v_max, format, flags);
+        ImGui::PopID();
+
+        return yesx || yesy;
+    }
+    bool RDragFvec3(const char* label, mz::fvec3* v, float v_speed, float v_min, float v_max, const char* format, ImGuiSliderFlags flags) {
+        f32 right_offset = GetWindowWidth() * g_ext_style.right_align;
+        AlignTextToFramePadding();
+        Text("%s", label); 
+        if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", label);
+        }
+        auto wnd = ImGui::GetCurrentWindow();
+        if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
+            SameLine();
+        } else {
+            SameLine(right_offset - ImGui::GetStyle().ItemSpacing.x * 3.f);
+        }
+        f32 item_width = GetWindowWidth() - right_offset - GetWindowWidth() * g_ext_style.right_align_padding;
+        f32 labelx_width = ImGui::CalcTextSize("X").x;
+        f32 labely_width = ImGui::CalcTextSize("Y").x;
+        f32 labelz_width = ImGui::CalcTextSize("Z").x;
+        f32 width_for_fields = item_width - (labelx_width + labely_width + labelz_width);
+        f32 width_per_field = width_for_fields / 3.f - ImGui::GetStyle().ItemSpacing.x / 3.f;
+
+        ImGui::PushID(v);
+        ImGui::Text("X");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesx = DragFloat("##x", &v->x, v_speed, v_min, v_max, format, flags);
+        ImGui::SameLine();
+        ImGui::Text("Y");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesy = DragFloat("##y", &v->y, v_speed, v_min, v_max, format, flags);
+        ImGui::SameLine();
+        ImGui::Text("Z");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesz = DragFloat("##z", &v->z, v_speed, v_min, v_max, format, flags);
+        ImGui::PopID();
+
+        return yesx || yesy || yesz;
+    }
+    bool RDragFvec4(const char* label, mz::fvec4* v, float v_speed, float v_min, float v_max, const char* format, ImGuiSliderFlags flags) {
+        f32 right_offset = GetWindowWidth() * g_ext_style.right_align;
+        AlignTextToFramePadding();
+        Text("%s", label); 
+        if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", label);
+        }
+        auto wnd = ImGui::GetCurrentWindow();
+        if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
+            SameLine();
+        } else {
+            SameLine(right_offset - ImGui::GetStyle().ItemSpacing.x * 4.f);
+        }
+        f32 item_width = GetWindowWidth() - right_offset - GetWindowWidth() * g_ext_style.right_align_padding;
+        f32 labelx_width = ImGui::CalcTextSize("X").x;
+        f32 labely_width = ImGui::CalcTextSize("Y").x;
+        f32 labelz_width = ImGui::CalcTextSize("Z").x;
+        f32 labelw_width = ImGui::CalcTextSize("W").x;
+        f32 width_for_fields = item_width - (labelx_width + labely_width + labelz_width + labelw_width);
+        f32 width_per_field = width_for_fields / 4.f - ImGui::GetStyle().ItemSpacing.x / 4.f;
+
+        ImGui::PushID(v);
+        ImGui::Text("X");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesx = DragFloat("##x", &v->x, v_speed, v_min, v_max, format, flags);
+        ImGui::SameLine();
+        ImGui::Text("Y");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesy = DragFloat("##y", &v->y, v_speed, v_min, v_max, format, flags);
+        ImGui::SameLine();
+        ImGui::Text("Z");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesz = DragFloat("##z", &v->z, v_speed, v_min, v_max, format, flags);
+        ImGui::SameLine();
+        ImGui::Text("W");
+        ImGui::SameLine();
+        SetNextItemWidth(width_per_field);
+        bool yesw = DragFloat("##w", &v->w, v_speed, v_min, v_max, format, flags);
+        ImGui::PopID();
+
+        return yesx || yesy || yesz || yesw;
+    }
+
     bool RDragFloatRange2(const char* label, float* v_current_min, float* v_current_max, float v_speed, float v_min, float v_max, const char* format, const char* format_max, ImGuiSliderFlags flags) {
         set_layout(label);
         PushID(v_current_min);

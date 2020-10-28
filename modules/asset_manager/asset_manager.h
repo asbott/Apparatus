@@ -47,7 +47,7 @@ struct Asset {
 
 	Icon_Type icon = ICON_TYPE_FILE;
 
-	// Only guaranteed to be valid if in memory
+	// Only guaranteed to be valid if asset is in memory
 	size_t runtime_data_size = 0;
 	
 	bool is(str_ptr_t str_id) {

@@ -47,7 +47,7 @@ void on_gui(void* parameter) {
     auto* asset_module = get_module("asset_manager");
     auto* asset_functions = (Asset_Manager_Function_Library*)asset_module->get_function_library();
     if (asset_module && asset_functions && asset_functions->validate(&params.texture)) {
-        ImGui::RDragFloat2("Cell size", params.cell_size.ptr, 0.1f, 1.f, 100000000.f);
+        ImGui::RDragFvec2("Cell size", &params.cell_size, 0.1f, 1.f, 100000000.f);
 
         if (Asset* asset = asset_functions->begin_use(params.texture)) {
             
@@ -65,7 +65,7 @@ void on_gui(void* parameter) {
             if (get_graphics()->get_render_target_size(render_target) != mz::ivec2(width, height)) {
                 get_graphics()->set_render_target_size(render_target, { width, height });
             }
-            ortho = mz::projection::ortho<f32>(0, tex->size.width, 0, tex->size.height, -1000, 1000);
+            ortho = mz::projection::ortho<f32>(0, (f32)tex->size.width, 0, (f32)tex->size.height, -1000, 1000);
 
             get_graphics()->set_clear_color(mz::COLOR_TRANSPARENT);
             get_graphics()->set_viewport(mz::viewport(0, 0, width, height));

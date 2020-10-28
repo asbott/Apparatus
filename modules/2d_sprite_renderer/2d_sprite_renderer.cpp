@@ -422,8 +422,9 @@ module_scope {
 			if (anim.time >= 1.f / anim.frames_per_second) {
 				anim.time -= 1.f / anim.frames_per_second;
 				anim.current_frame++;
-				if (anim.current_frame > anim.target_frames.max - anim.target_frames.min) anim.current_frame = 0;
 			}
+
+			if (anim.current_frame > anim.target_frames.max - anim.target_frames.min) anim.current_frame = 0;
 		});
 
 		
