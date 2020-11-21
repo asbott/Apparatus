@@ -61,6 +61,7 @@ inline bool SpriteAnimation2D::get_sheet_data(Texture_Sheet_Runtime_Data* out) {
 					auto* preset_data = asset->get_runtime_data<Sprite_Animation_2D_Preset_Data>();
 					if (functions->validate(&preset_data->texture_sheet)) {
 						sheet_asset = functions->begin_use(preset_data->texture_sheet);
+						preset_data = asset->get_runtime_data<Sprite_Animation_2D_Preset_Data>();
 						frames_per_second = preset_data->frames_per_second;
 						target_frames = preset_data->target_frames;
 					}
@@ -72,7 +73,7 @@ inline bool SpriteAnimation2D::get_sheet_data(Texture_Sheet_Runtime_Data* out) {
 		}
 	}
 
-	if (sheet_asset && sheet_asset->is("TextureSheet2D") && sheet_asset->in_use) {
+	if (sheet_asset && sheet_asset->is("TextureSheet2D")) {
 		*out = *sheet_asset->get_runtime_data<Texture_Sheet_Runtime_Data>();
 		functions->end_use(sheet_asset->id);
 		return true;
@@ -96,7 +97,7 @@ inline void on_gui(SpriteAnimation2D* anim) {
 	ImGui::RCheckbox("Play", &anim->is_playing);
 	ImGui::RDragInt("Depth level", &anim->depth_level);
 	ImGui::RColorEdit4("Tint", anim->tint.ptr);
-	ImGui::RDragFloat2("Origin", anim->origin.ptr, 0.1f);
+	ImGui::RDragFvec2("Origin", &anim->origin, 0.1f);
 	ImGui::RCheckbox("Flip X", &anim->xflip);
 	ImGui::RSliderInt("Current frame", &anim->current_frame, 0, anim->target_frames.max - anim->target_frames.min);
 
@@ -151,7 +152,7 @@ inline void on_gui(SpriteAnimation2D* anim) {
 			f32 bottom = offset.y / tex_data->size.height;
 			f32 top = (offset.y + sheet_data.cell_size.height) / tex_data->size.height;
 
-			ImGui::Image(get_graphics()->get_native_texture_handle(tex_data->graphics_id), { 128, 128 }, { left, bottom }, { right, top }, anim->tint, mz::COLOR_WHITE);
+			ImGui::Image(get_graphics()->get_native_texture_handle(tex_data->graphics_id), { 128, 128 }, { anim->xflip ? right : left, bottom }, { anim->xflip ? left : right, top }, anim->tint, mz::COLOR_WHITE);
 
 			ImGui::Text("Frame: %i/%i (%i/%i)", 
 					anim->preview_frame, target_frames.max - target_frames.min,

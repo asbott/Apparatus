@@ -110,7 +110,7 @@ void on_gui(void* parameter) {
             if (get_graphics()->get_render_target_size(render_target) != mz::ivec2(width, height)) {
                 get_graphics()->set_render_target_size(render_target, { width, height });
             }
-            ortho = mz::projection::ortho<f32>(0, tex->size.width, 0, tex->size.height, -1000, 1000);
+            ortho = mz::projection::ortho<f32>(0, (f32)tex->size.width, 0, (f32)tex->size.height, -1000, 1000);
 
             get_graphics()->set_clear_color(mz::COLOR_TRANSPARENT);
             get_graphics()->set_viewport(mz::viewport(0, 0, width, height));
@@ -156,7 +156,7 @@ void on_gui(void* parameter) {
                     );
                     u32 index = ny * ncells.x + nx;
 
-                    if (index >= params.target_frames.min && index <= params.target_frames.max) {
+                    if ((s32)index >= params.target_frames.min && (s32)index <= params.target_frames.max) {
                         gizmo_list.add_wire_quad(quad, mz::COLOR_RED);
                     }
                 }

@@ -21,4 +21,5 @@ lib
 *Makefile
 *.makefile
 
-all
+deps/glad/all
+*metrixpp.db

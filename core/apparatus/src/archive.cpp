@@ -25,6 +25,8 @@ Binary_Archive::Binary_Archive(str_ptr_t file_path, size_t hint_size) : file_pat
             }
         }
 
+        
+
         byte* buffer_head = buffer.data();
 
         byte* buffer_ptr = buffer_head;
