@@ -29,6 +29,8 @@ A trello board can be found <a href="https://trello.com/b/xe6pIKCK/apparatus">he
 1. Clone the repo
     
     `git clone https://github.com/asbott/Apparatus my_repo_dir`
+    
+    `cd my_repo_dir`
 2. Initialize and update submodules
     
     `git submodule update --init`
