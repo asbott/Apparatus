@@ -72,6 +72,7 @@ module_scope {
                         [](void* data) {
                             on_gui((PhysicsBody2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "friction",
                         sizeof(f32),
                         ap_offsetof(PhysicsBody2D, friction),
@@ -80,6 +81,7 @@ module_scope {
                         [](void* data) {
                             on_gui((PhysicsBody2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "density",
                         sizeof(f32),
                         ap_offsetof(PhysicsBody2D, density),
@@ -88,6 +90,7 @@ module_scope {
                         [](void* data) {
                             on_gui((PhysicsBody2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "restitution",
                         sizeof(f32),
                         ap_offsetof(PhysicsBody2D, restitution),
@@ -96,6 +99,7 @@ module_scope {
                         [](void* data) {
                             on_gui((PhysicsBody2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "velocity",
                         sizeof(fvec2),
                         ap_offsetof(PhysicsBody2D, velocity),
@@ -104,6 +108,7 @@ module_scope {
                         [](void* data) {
                             on_gui((PhysicsBody2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "body_type",
                         sizeof(Physics_Body_Type),
                         ap_offsetof(PhysicsBody2D, body_type),
@@ -112,6 +117,7 @@ module_scope {
                         [](void* data) {
                             on_gui((PhysicsBody2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "on_contact_begin",
                         sizeof(collision_callback_t),
                         ap_offsetof(PhysicsBody2D, on_contact_begin),
@@ -120,6 +126,7 @@ module_scope {
                         [](void* data) {
                             on_gui((PhysicsBody2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "on_contact_end",
                         sizeof(collision_callback_t),
                         ap_offsetof(PhysicsBody2D, on_contact_end),
@@ -152,6 +159,7 @@ module_scope {
                         [](void* data) {
                             on_gui((CollisionShape2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "offset",
                         sizeof(fvec2),
                         ap_offsetof(CollisionShape2D, offset),
@@ -160,6 +168,7 @@ module_scope {
                         [](void* data) {
                             on_gui((CollisionShape2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "is_trigger",
                         sizeof(bool),
                         ap_offsetof(CollisionShape2D, is_trigger),
@@ -168,6 +177,7 @@ module_scope {
                         [](void* data) {
                             on_gui((CollisionShape2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "half_extents",
                         sizeof(fvec2),
                         ap_offsetof(CollisionShape2D, half_extents),
@@ -176,6 +186,7 @@ module_scope {
                         [](void* data) {
                             on_gui((CollisionShape2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "shape_type",
                         sizeof(Collision_Shape_Type_2D),
                         ap_offsetof(CollisionShape2D, shape_type),

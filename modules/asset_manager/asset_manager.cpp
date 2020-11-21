@@ -71,8 +71,8 @@ struct Free_Data_Block {
     size_t size;
 };
 
-Gui_Window g_asset_manager = { true, "Asset Manager" };
-Gui_Window g_asset_inspector = { false, "Asset Inspector" };
+Gui_Window g_asset_manager = { true, "Asset Manager", "Assets" };
+Gui_Window g_asset_inspector = { false, "Asset Inspector", "Assets" };
 
 path_str_t g_current_dir;
 path_str_t g_assets_dir;
@@ -387,7 +387,7 @@ bool validate(asset_id_t* paid) {
     auto uid = get_uid(aid);
 
     // If index is in range, asset isnt garbage and ids match - aid is valid.
-    if (idx >= 0 && idx < assets.size() && !assets[idx].is_garbage && assets[idx].id == aid)
+    if (idx >= 0 && idx < assets.size() && !assets[idx].is_garbage && get_uid(assets[idx].id) == uid)
         return true;
 
     for (auto& asset : assets) {

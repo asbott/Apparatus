@@ -2,6 +2,18 @@
 Modular game engine with fully native runtime gameplay
 programming.
 
+# Note
+I haven't been able to put much work into this as it's a hobby project and I have
+a very high rent to pay with a very low pay. It's likely that I won't be able to
+put any work in at all soon as it seems that I'm going to have to sell my laptop
+to pay the rent. Feel free to contribute while I'm gone, I'll have a crappy laptop
+to at least check in on the repo.
+
+# Plan
+I got tired of keeping long physical lists of TODO's, so I created a trello board
+to just dump everything I can think of in there so I don't forget about it and
+always have something to do. The board can be found <a href="https://trello.com/b/xe6pIKCK/apparatus">here</a>.
+
 # Building
 
 1. Clone the repo
@@ -27,6 +39,8 @@ programming.
 Apparatus should be fully functional on Linux systems using x11. Has been tested with Manjaro 20.1.2, compiling with g++ 10.2.0.
 
 # Showcase
+(These gifs are of a very outdated version1)
+
 Runtime management of entites/components (entt backend)
 ![](repo/entitiescomponents.gif)
 

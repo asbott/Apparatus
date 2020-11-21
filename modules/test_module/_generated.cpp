@@ -72,6 +72,7 @@ module_scope {
                         [](void* data) {
                             do_gui<f32>("hforce", (f32*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "hforce",
                         sizeof(f32),
                         ap_offsetof(BallMovement, hforce),
@@ -80,6 +81,7 @@ module_scope {
                         [](void* data) {
                             do_gui<f32>("jump_force", (f32*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "jump_force",
                         sizeof(f32),
                         ap_offsetof(BallMovement, jump_force),
@@ -112,6 +114,7 @@ module_scope {
                         [](void* data) {
                             do_gui<float>("move_speed", (float*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "move_speed",
                         sizeof(float),
                         ap_offsetof(WASDMovement, move_speed),
@@ -144,6 +147,7 @@ module_scope {
                         [](void* data) {
                             do_gui<float>("hspeed", (float*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "hspeed",
                         sizeof(float),
                         ap_offsetof(AnimatedWASDMovement, hspeed),
@@ -152,6 +156,7 @@ module_scope {
                         [](void* data) {
                             do_gui<float>("vspeed", (float*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "vspeed",
                         sizeof(float),
                         ap_offsetof(AnimatedWASDMovement, vspeed),
@@ -159,6 +164,7 @@ module_scope {
                     Property_Info { 
                         [](void* data) {
                             ImGui::InputAsset("walk_right", (asset_id_t*)data, "SpriteAnimation2DPreset");                        },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "walk_right",
                         sizeof(asset_id_t),
                         ap_offsetof(AnimatedWASDMovement, walk_right),
@@ -166,6 +172,7 @@ module_scope {
                     Property_Info { 
                         [](void* data) {
                             ImGui::InputAsset("walk_up", (asset_id_t*)data, "SpriteAnimation2DPreset");                        },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "walk_up",
                         sizeof(asset_id_t),
                         ap_offsetof(AnimatedWASDMovement, walk_up),
@@ -173,9 +180,43 @@ module_scope {
                     Property_Info { 
                         [](void* data) {
                             ImGui::InputAsset("walk_down", (asset_id_t*)data, "SpriteAnimation2DPreset");                        },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "walk_down",
                         sizeof(asset_id_t),
                         ap_offsetof(AnimatedWASDMovement, walk_down),
+                    },
+                }
+            };
+        }
+        {
+            uintptr_t id = (uintptr_t)typeid(FollowEntity).name();
+            runtime_ids.emplace(id);
+            name_id_map["FollowEntity"] = id;
+            component_info[id] = {
+                [](entt::registry& reg, entt::entity entity) { 
+                    return &reg.emplace<FollowEntity>(entity);
+                },
+                [](entt::registry& reg, entt::entity entity) { 
+                    if (!reg.has<FollowEntity>(entity)) return (void*)NULL;
+                    return (void*)&reg.get<FollowEntity>(entity);
+                }, 
+                [](entt::registry& reg, entt::entity entity) { 
+                    reg.remove<FollowEntity>(entity);
+                },
+            
+                "FollowEntity",
+                id,
+                false,
+                sizeof(FollowEntity),
+                std::vector<Property_Info> {
+                    Property_Info { 
+                        [](void* data) {
+                            ImGui::InputEntity("target", (entt::entity*)data);
+                        },
+                        (Property_Flag)(PROPERTY_FLAG_NONE | PROPERTY_FLAG_ENTITY),
+                        "target",
+                        sizeof(entity_t),
+                        ap_offsetof(FollowEntity, target),
                     },
                 }
             };
@@ -222,5 +263,6 @@ module_scope {
         entt::resolve<BallMovement>().reset();
         entt::resolve<WASDMovement>().reset();
         entt::resolve<AnimatedWASDMovement>().reset();
+        entt::resolve<FollowEntity>().reset();
     }
 }

@@ -732,14 +732,23 @@ module_scope {
                             output_stream << "                            strcpy((char*)data, s.c_str());\n";
                         } else if (member.tags.find(Tag("color"))  != member.tags.end()) {
                             output_stream << "                            ImGui::RColorEdit4(\"" << member.name << "\", (f32*)data);\n";
+                        } else if (member.tags.find(Tag("entity"))  != member.tags.end()) {
+                            output_stream << "                            ImGui::InputEntity(\"" << member.name << "\", (entt::entity*)data);\n";
                         } else if (member.tags.find(Tag("asset"))  != member.tags.end() && (*member.tags.find(Tag("asset"))).args.size() > 0) {
                             auto& arg = *(*member.tags.find(Tag("asset"))).args.begin();
                             output_stream << "                            ImGui::InputAsset(\"" << member.name << "\", (asset_id_t*)data, \"" << arg << "\");";
                         } else { 
                             output_stream << "                            do_gui<" << member.property_type << ">(\"" << member.name << "\", (" << member.property_type << "*)data);\n";
                         }
-
+                        
                         output_stream << "                        },\n";
+
+                        output_stream << "                        (Property_Flag)(PROPERTY_FLAG_NONE";
+                        if (member.tags.find(Tag("entity"))  != member.tags.end()) {
+                            output_stream << " | PROPERTY_FLAG_ENTITY";
+                        }
+                        output_stream << "),\n";
+
                         output_stream << "                        \"" << member.name << "\",\n";
                         output_stream << "                        " << this_sizeof << ",\n";
                         output_stream << "                        ap_offsetof(" << struct_item.name << ", " << member.name << "),\n";

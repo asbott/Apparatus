@@ -71,6 +71,7 @@ module_scope {
                     Property_Info { 
                         [](void* data) {
                             ImGui::InputAsset("source_texture", (asset_id_t*)data, "Texture");                        },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "source_texture",
                         sizeof(asset_id_t),
                         ap_offsetof(TileMap2D, source_texture),
@@ -79,6 +80,7 @@ module_scope {
                         [](void* data) {
                             do_gui<fvec2>("tile_size", (fvec2*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "tile_size",
                         sizeof(fvec2),
                         ap_offsetof(TileMap2D, tile_size),

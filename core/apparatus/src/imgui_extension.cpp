@@ -10,9 +10,13 @@
 
 ImGuiExtensionStyle g_ext_style;
 
-
-
 namespace ImGui {
+
+    bool can_align_to_right() {
+        auto wnd = ImGui::GetCurrentWindow(); 
+        // Can only align if NOT in a popup, NOT in a child menu, NOT in a menu bar
+        return !(wnd->Flags & ImGuiWindowFlags_Popup) && !(wnd->Flags & ImGuiWindowFlags_ChildMenu) && !wnd->DC.MenuBarAppending;
+    }
 
     void set_layout(str_ptr_t label) {
         f32 right_offset = GetWindowWidth() * g_ext_style.right_align;
@@ -21,13 +25,28 @@ namespace ImGui {
         if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", label);
         }
-        auto wnd = ImGui::GetCurrentWindow();
-        if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
-            SameLine();
-        } else {
+        
+        if (can_align_to_right()) {
             SameLine(right_offset);
             f32 item_width = GetWindowWidth() - right_offset - GetWindowWidth() * g_ext_style.right_align_padding;
             SetNextItemWidth(item_width);
+        } else {
+            SameLine();
+        }
+        
+    }
+
+    void set_layout_for_known_width(str_ptr_t label, f32 width) {
+        f32 right_offset = GetWindowContentRegionWidth() - width - g_ext_style.right_align_padding * GetWindowWidth();
+        AlignTextToFramePadding();
+        Text("%s", label); 
+        if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", label);
+        } 
+        if (can_align_to_right()) {
+            SameLine(right_offset);
+        } else {
+            SameLine();
         }
         
     }
@@ -315,11 +334,18 @@ namespace ImGui {
 
 
     bool RCheckbox(const char* label, bool* v) {
-        set_layout(label);
+        set_layout_for_known_width(label, ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetStyle().FrameBorderSize * 2);
         PushID(v);
         bool ret = Checkbox("", v);
         PopID();
         return ret;
+    }
+
+    void RCheckboxReadonly(const char* label, bool v) {
+        set_layout_for_known_width(label, ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetStyle().FrameBorderSize * 2);
+        static name_str_t id = "";
+        sprintf(id, "##%s", label);
+        Checkbox(id, &v);
     }
 
     bool RBeginCombo(const char* label, const char* preview_value, ImGuiComboFlags flags) {

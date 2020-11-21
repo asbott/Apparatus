@@ -72,6 +72,7 @@ module_scope {
                         [](void* data) {
                             ImGui::RColorEdit4("clear_color", (f32*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "clear_color",
                         sizeof(color16),
                         ap_offsetof(View2D, clear_color),
@@ -104,6 +105,7 @@ module_scope {
                         [](void* data) {
                             do_gui<fvec2>("position", (fvec2*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "position",
                         sizeof(fvec2),
                         ap_offsetof(Transform2D, position),
@@ -112,6 +114,7 @@ module_scope {
                         [](void* data) {
                             do_gui<f32>("rotation", (f32*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "rotation",
                         sizeof(f32),
                         ap_offsetof(Transform2D, rotation),
@@ -120,6 +123,7 @@ module_scope {
                         [](void* data) {
                             do_gui<fvec2>("scale", (fvec2*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "scale",
                         sizeof(fvec2),
                         ap_offsetof(Transform2D, scale),

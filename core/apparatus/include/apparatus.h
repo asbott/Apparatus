@@ -26,3 +26,5 @@ using namespace mz;
 #endif
 
 #define tag(...) 
+
+typedef entt::entity entity_t;

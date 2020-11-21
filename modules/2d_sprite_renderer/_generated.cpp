@@ -71,6 +71,7 @@ module_scope {
                     Property_Info { 
                         [](void* data) {
                             ImGui::InputAsset("texture", (asset_id_t*)data, "Texture");                        },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "texture",
                         sizeof(asset_id_t),
                         ap_offsetof(Sprite2D, texture),
@@ -79,6 +80,7 @@ module_scope {
                         [](void* data) {
                             ImGui::RColorEdit4("tint", (f32*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "tint",
                         sizeof(color),
                         ap_offsetof(Sprite2D, tint),
@@ -87,6 +89,7 @@ module_scope {
                         [](void* data) {
                             do_gui<fvec2>("origin", (fvec2*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "origin",
                         sizeof(fvec2),
                         ap_offsetof(Sprite2D, origin),
@@ -95,6 +98,7 @@ module_scope {
                         [](void* data) {
                             do_gui<int>("depth_level", (int*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "depth_level",
                         sizeof(int),
                         ap_offsetof(Sprite2D, depth_level),
@@ -127,6 +131,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "is_playing",
                         sizeof(bool),
                         ap_offsetof(SpriteAnimation2D, is_playing),
@@ -135,6 +140,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "depth_level",
                         sizeof(int),
                         ap_offsetof(SpriteAnimation2D, depth_level),
@@ -143,6 +149,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "origin",
                         sizeof(fvec2),
                         ap_offsetof(SpriteAnimation2D, origin),
@@ -151,6 +158,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "tint",
                         sizeof(color16),
                         ap_offsetof(SpriteAnimation2D, tint),
@@ -159,6 +167,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "animation_preset",
                         sizeof(asset_id_t),
                         ap_offsetof(SpriteAnimation2D, animation_preset),
@@ -167,6 +176,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "texture_sheet",
                         sizeof(asset_id_t),
                         ap_offsetof(SpriteAnimation2D, texture_sheet),
@@ -175,6 +185,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "frames_per_second",
                         sizeof(f32),
                         ap_offsetof(SpriteAnimation2D, frames_per_second),
@@ -183,6 +194,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "target_frames",
                         sizeof(irange),
                         ap_offsetof(SpriteAnimation2D, target_frames),
@@ -191,6 +203,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "xflip",
                         sizeof(bool),
                         ap_offsetof(SpriteAnimation2D, xflip),
@@ -199,6 +212,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "current_frame",
                         sizeof(s32),
                         ap_offsetof(SpriteAnimation2D, current_frame),
@@ -207,6 +221,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "time",
                         sizeof(f32),
                         ap_offsetof(SpriteAnimation2D, time),
@@ -215,6 +230,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "preview_frame",
                         sizeof(s32),
                         ap_offsetof(SpriteAnimation2D, preview_frame),
@@ -223,6 +239,7 @@ module_scope {
                         [](void* data) {
                             on_gui((SpriteAnimation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "preview_time",
                         sizeof(f32),
                         ap_offsetof(SpriteAnimation2D, preview_time),

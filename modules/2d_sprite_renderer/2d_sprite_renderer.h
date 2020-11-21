@@ -98,7 +98,7 @@ inline void on_gui(SpriteAnimation2D* anim) {
 	ImGui::RColorEdit4("Tint", anim->tint.ptr);
 	ImGui::RDragFloat2("Origin", anim->origin.ptr, 0.1f);
 	ImGui::RCheckbox("Flip X", &anim->xflip);
-	ImGui::RDragInt("Current frame", &anim->current_frame);
+	ImGui::RSliderInt("Current frame", &anim->current_frame, 0, anim->target_frames.max - anim->target_frames.min);
 
 	if (!use_preset) {
 		ImGui::Spacing();

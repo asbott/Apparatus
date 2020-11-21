@@ -72,6 +72,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "type",
                         sizeof(Particle_Type),
                         ap_offsetof(ParticleSimulation2D, type),
@@ -80,6 +81,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "loop",
                         sizeof(bool),
                         ap_offsetof(ParticleSimulation2D, loop),
@@ -88,6 +90,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "duration",
                         sizeof(f32),
                         ap_offsetof(ParticleSimulation2D, duration),
@@ -96,6 +99,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "spawn_rate",
                         sizeof(f32),
                         ap_offsetof(ParticleSimulation2D, spawn_rate),
@@ -104,6 +108,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "angle_range",
                         sizeof(fvec2),
                         ap_offsetof(ParticleSimulation2D, angle_range),
@@ -112,6 +117,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "speed_range",
                         sizeof(fvec2),
                         ap_offsetof(ParticleSimulation2D, speed_range),
@@ -120,6 +126,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "life_time",
                         sizeof(f32),
                         ap_offsetof(ParticleSimulation2D, life_time),
@@ -128,6 +135,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "preview_in_editor",
                         sizeof(bool),
                         ap_offsetof(ParticleSimulation2D, preview_in_editor),
@@ -136,6 +144,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "play_on_start",
                         sizeof(bool),
                         ap_offsetof(ParticleSimulation2D, play_on_start),
@@ -144,6 +153,7 @@ module_scope {
                         [](void* data) {
                             on_gui((ParticleSimulation2D*)data);
                         },
+                        (Property_Flag)(PROPERTY_FLAG_NONE),
                         "state",
                         sizeof(Particle_Simulation_State),
                         ap_offsetof(ParticleSimulation2D, state),

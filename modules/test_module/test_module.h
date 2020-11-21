@@ -36,4 +36,10 @@ module_scope {
 		tag(property, asset(SpriteAnimation2DPreset))
 		asset_id_t walk_down = NULL_ASSET_ID;
 	};
+
+	tag(component)
+	struct FollowEntity {
+		tag(entity, property)
+		entity_t target;
+	};
 }

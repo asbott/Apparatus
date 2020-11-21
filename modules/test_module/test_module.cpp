@@ -85,6 +85,13 @@ module_scope {
 
 			transform.position += dir * fvec2(movement.hspeed * delta, movement.vspeed * delta);
 		});
+
+		reg.view<FollowEntity, Transform2D>().each([&reg](FollowEntity& follow, Transform2D& transform) {
+			if (!reg.valid(follow.target)) return;
+
+			auto& target_transform = reg.get<Transform2D>(follow.target);
+			transform.position = target_transform.position;
+		});
     }
 
 	module_function(void) on_render() {

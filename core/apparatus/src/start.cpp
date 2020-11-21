@@ -54,6 +54,40 @@ struct Entity_Preset {
     entity_preset_fn_t fn;
 };
 
+struct Window_Category_Node {
+
+    Window_Category_Node(str_ptr_t _name) {
+        strcpy(name, _name);
+    }
+
+    void assure_child(str_ptr_t _name) {
+        if (used_names.count(_name) == 0) {
+            child_nodes.emplace_back(_name);
+            used_names.emplace(_name);
+        }
+    }
+
+    void add_window(Gui_Window* wnd) {
+        windows.emplace(wnd);
+    }
+
+    bool iterate(std::function<bool(Gui_Window*)> fn) {
+        for (auto* wnd : windows) {
+            if (!fn(wnd)) return false;
+        }
+        for (auto& c : child_nodes) {
+            if (!c.iterate(fn)) return false;
+        }
+        return true;
+    }
+
+    Hash_Set<Gui_Window*> windows;
+    Dynamic_Array<Window_Category_Node> child_nodes;
+    Hash_Set<Dynamic_String> used_names;
+
+    name_str_t name = "Unnamed";
+};
+
 Component_Reference component_clipboard;
 
 Graphics_Context* g_graphics;
@@ -65,16 +99,16 @@ entt::registry g_reg;
 
 Dynamic_Array<Module*> g_modules;
 
-Hash_Set<Gui_Window*> gui_windows;
+Window_Category_Node* g_windows = NULL;
 Hash_Set<Gui_Popup*> gui_popups;
 
 Static_Array<graphics_id_t, ICON_TYPE_COUNT> icons;
 
-Gui_Window entity_inspector = { true, "Entity Inspector" };
-Gui_Window scene_inspector = { true, "Scene Inspector" };
+Gui_Window entity_inspector = { true, "Entity Inspector", "Scene" };
+Gui_Window scene_inspector = { true, "Scene Inspector", "Scene" };
 Gui_Window module_manager = { false, "Modules Manager" };
 Gui_Window log_window = { false, "Log" };
-Gui_Window style_editor = { false, "Style Editor" };
+Gui_Window style_editor = { false, "Style", "Settings" };
 
 Gui_Popup add_component_popup;
 Gui_Popup manage_component_popup;
@@ -119,6 +153,36 @@ namespace ImGui {
         if (bgr_color != mz::color(0)) ImGui::PopStyleColor();
         return pressed;
     }
+
+    bool InputEntity(str_ptr_t label, entt::entity* entity) {
+        static char na[] = "<null>";
+		if (g_reg.valid(*entity)) ImGui::RInputText(label, g_reg.get<Entity_Info>(*entity).name, sizeof(entity_name_t), ImGuiInputTextFlags_ReadOnly);
+		else ImGui::RInputText(label, na, sizeof(na), ImGuiInputTextFlags_ReadOnly);
+
+        if (ImGui::BeginDragDropTarget()) {
+			auto* p = ImGui::AcceptDragDropPayload("entity");
+			if (p) {
+				auto payload = (Gui_Payload*)p->Data;
+				auto new_entity = (entt::entity)(uintptr_t)payload->value;
+
+                if (*entity != new_entity) {
+                    *entity = new_entity;
+                    return true;
+                }
+			}
+			ImGui::EndDragDropTarget();
+		}
+
+        if (g_reg.valid(*entity)) {
+			ImGui::SameLine();
+			if (ImGui::Button("X")) {
+				*entity = entt::null;
+                return true;
+			}
+		}
+
+        return false;
+    }
 }
 
 void quit() {
@@ -145,11 +209,45 @@ Module* get_module(str_ptr_t str_id) {
 }
 
 void register_gui_window(Gui_Window* wnd) {
-    gui_windows.emplace(wnd);
+    
+    
+    /*Dynamic_String category = Dynamic_String(wnd->category);
+    std::size_t last_dot = category.find_last_of('.');
+    if (last_dot != Dynamic_String::npos) category = category.substr(last_dot);
+    */
+
+    std::stringstream ss(wnd->category);
+    Dynamic_String category = "";
+    Window_Category_Node* p = g_windows;
+    while (std::getline(ss, category, '.')) {
+        p->assure_child(category.c_str());
+        for (auto& c : p->child_nodes) {
+            if (strcmp(c.name, category.c_str()) == 0) {
+                p = &c;
+            }
+        }
+    }
+
+    p->add_window(wnd);
 }
 
 void unregister_gui_window(Gui_Window* wnd) {
-    gui_windows.erase(wnd);
+    std::function<bool(Window_Category_Node*, Gui_Window*)> rm;
+    rm = [&rm](Window_Category_Node* n, Gui_Window* wnd) {
+        for (auto it = n->windows.begin(); it != n->windows.end(); ++it) {
+            if ((*it) == wnd) {
+                n->windows.erase(it);
+                return true;
+            }
+        }
+
+        for (auto& c : n->child_nodes) {
+            if (rm(&c, wnd)) return true;
+        }
+        return false;
+    };
+
+    rm(g_windows, wnd);
 }
 
 void register_gui_popup(Gui_Popup* pop) {
@@ -289,7 +387,12 @@ void to_file(entt::registry& reg, str_ptr_t dir_path) {
                     entity_name_t prop_name = "";
                     strcpy(prop_name, prop.name.c_str());
                     byte* comp = (byte*) mod->get_component(comp_id, reg, entity);
-                    comp_archive.write(prop_name, comp + prop.offset, prop.size);
+                    if (prop.flags & PROPERTY_FLAG_ENTITY) {
+                        entt::entity prop_entity = *(entt::entity*)(comp + prop.offset);
+                        comp_archive.write<entity_name_t>(prop_name, g_reg.get<Entity_Info>(prop_entity).name);
+                    } else {
+                        comp_archive.write(prop_name, comp + prop.offset, prop.size);
+                    }
                 }
                 comp_archive.flush();
             }
@@ -301,6 +404,23 @@ void to_file(entt::registry& reg, str_ptr_t dir_path) {
 }
 
 void from_file(entt::registry& reg, str_ptr_t dir_path) {
+    struct Deferred_Entity_Property {
+        Deferred_Entity_Property(entt::entity e, uintptr_t c, size_t po, str_ptr_t pe, Module* m)
+            : entity(e), comp_id(c), prop_offset(po), mod(m) {
+            strcpy(prop_entity_name, pe);
+        }
+        entt::entity entity;
+
+        uintptr_t comp_id;
+        size_t prop_offset;
+        entity_name_t prop_entity_name;
+        Module* mod;
+    };
+
+    // Entity properties that needs to be assigned AFTER all entites
+    // are loaded.
+    static Dynamic_Array<Deferred_Entity_Property> deferred_entity_properties;
+
     Path::iterate_directories(dir_path, [&reg, &dir_path](str_ptr_t entry) {
         if (Path::is_file(entry) && !Path::has_extension(entry)) {
 
@@ -327,6 +447,7 @@ void from_file(entt::registry& reg, str_ptr_t dir_path) {
 
                     path_str_t comp_real_path = "";
                     sprintf(comp_real_path, "%s/%s", dir_path, comp_path);
+                    if (!Path::exists(comp_real_path)) continue;
                     Binary_Archive comp_archive(comp_real_path);
 
                     if (!comp_archive.is_valid_id("module") || comp_archive.size_of("module") != sizeof(Module::str_id)) {
@@ -362,15 +483,19 @@ void from_file(entt::registry& reg, str_ptr_t dir_path) {
                         continue;
                     }
 
-                    comp_archive.iterate([&comp_id, comp_mod, &comp, &comp_archive](str_ptr_t id) {
+                    comp_archive.iterate([&comp_id, comp_mod, &comp, &comp_archive, &entity](str_ptr_t id) {
                         const auto& comp_info = comp_mod->get_component_info(comp_id);
 
                         for (auto& prop : comp_info->properties) {
                             if (strcmp(prop.name.c_str(), id) == 0) {
                                 size_t actual_size = 0;
                                 auto data = comp_archive.read(id, &actual_size);
-                                if (actual_size == prop.size) {
-                                    memcpy((byte*)comp + prop.offset, data, actual_size);
+                                if (prop.flags & PROPERTY_FLAG_ENTITY) {    
+                                    deferred_entity_properties.push_back({ entity, comp_id, prop.offset, (str_ptr_t)data, comp_mod });
+                                } else {
+                                    if (actual_size == prop.size) {
+                                        memcpy((byte*)comp + prop.offset, data, actual_size);
+                                    }
                                 }
                             } 
                         }
@@ -381,6 +506,18 @@ void from_file(entt::registry& reg, str_ptr_t dir_path) {
             }
         }
     }, false);
+
+    for (auto& d : deferred_entity_properties) {
+        g_reg.each([&](entt::entity entity) {
+            auto& info = g_reg.get<Entity_Info>(entity);
+            if (strcmp(info.name, d.prop_entity_name) == 0) {
+                auto* comp = (byte*)d.mod->get_component(d.comp_id, g_reg, d.entity);
+                memcpy(comp + d.prop_offset, &entity, sizeof(entt::entity));
+            }
+        });
+    }
+
+    deferred_entity_properties.clear();
 }
 
 #ifdef _OS_WINDOWS
@@ -445,8 +582,19 @@ void save_user_settings(str_ptr_t dir) {
     path_str_t user_file = "";
     sprintf(user_file, "%s/window_states", dir);
     Binary_Archive archive(user_file);
-    for (auto gui_wnd : gui_windows) {
+    g_windows->iterate([&](Gui_Window* gui_wnd) {
         archive.write<Gui_Window>(gui_wnd->name, *gui_wnd);
+        return true;
+    });
+    for (auto& [level, color] : log_context.filter_colors) {
+        name_str_t str = "";
+        sprintf(str, "%s_color", spdlog::level::to_string_view(level).data());
+        archive.write<mz::color>(str, color);
+    }
+    for (auto& [level, flag] : log_context.filter_flags) {
+        name_str_t str = "";
+        sprintf(str, "%s_flag", spdlog::level::to_string_view(level).data());
+        archive.write<bool>(spdlog::level::to_string_view(level).data(), flag);
     }
     archive.flush();
 }
@@ -456,13 +604,24 @@ void load_user_settings(str_ptr_t dir) {
     path_str_t user_file = "";
     sprintf(user_file, "%s/window_states", dir);
     Binary_Archive archive(user_file);
-    for (auto gui_wnd : gui_windows) {
-        if (!archive.is_valid_id(gui_wnd->name)) continue;
+    g_windows->iterate([&](Gui_Window* gui_wnd) {
+        if (!archive.is_valid_id(gui_wnd->name)) return false;
         *gui_wnd = archive.read<Gui_Window>(gui_wnd->name);
 
         if (gui_wnd->focused) {
             ImGui::SetWindowFocus(gui_wnd->name);
         }
+        return true;
+    });
+    for (auto& [level, color] : log_context.filter_colors) {
+        name_str_t str = "";
+        sprintf(str, "%s_color", spdlog::level::to_string_view(level).data());
+        if (archive.is_valid_id(str)) color = archive.read<mz::color>(str);
+    }
+    for (auto& [level, flag] : log_context.filter_flags) {
+        name_str_t str = "";
+        sprintf(str, "%s_flag", spdlog::level::to_string_view(level).data());
+        if (archive.is_valid_id(str)) flag = archive.read<bool>(str);
     }
     archive.flush();
 }
@@ -579,6 +738,8 @@ void do_file_browser_gui() {
         }
     });
 
+    static path_str_t file_name = "";
+
     Path::iterate_directories(g_browse_dir, [](str_ptr_t path) {
         if (Path::is_file(path) && g_browse_mode != File_Browser_Mode::directory) {
             path_str_t file_name = "";
@@ -591,6 +752,7 @@ void do_file_browser_gui() {
             ImGui::SameLine();
             if (ImGui::Selectable(file_name, strcmp(path, file_browser_popup.return_value) == 0)) {
                 strcpy(file_browser_popup.return_value, path);
+                Path::name_with_extension(path, file_name);
             }
             if (ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked(0)) {
                 if (file_browser_popup.done_fn) {
@@ -603,6 +765,10 @@ void do_file_browser_gui() {
     });
 
     ImGui::EndChildFrame();
+    
+    if (ImGui::InputText("File name", file_name, sizeof(file_name))) {
+        sprintf(file_browser_popup.return_value, "%s/%s", g_browse_dir, file_name);
+    }
 
     ImGui::Text("Selected: %s", file_browser_popup.return_value);
 
@@ -661,6 +827,7 @@ void save_project() {
 
     to_file(g_reg, g_ecs_dir);
     save_user_settings(g_user_dir);
+    ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);
     ImGui::SaveStyleToDisk(g_style_path);
 }
 
@@ -681,6 +848,7 @@ void load_project(str_ptr_t new_dir) {
     g_deferred_functions.clear();
 
     load_user_settings(g_user_dir);
+    ImGui::LoadIniSettingsFromDisk(ImGui::GetIO().IniFilename);
     ImGui::LoadStyleFromDisk(g_style_path);
 }
 
@@ -767,6 +935,8 @@ int start(int argc, char** argv) {
 
     path_str_t essential_dir = "";
     sprintf(essential_dir, "%s/../../essential", get_executable_directory());
+
+    g_windows = new Window_Category_Node("Windows");
 
     register_gui_window(&scene_inspector);
     register_gui_window(&entity_inspector);
@@ -881,7 +1051,7 @@ int start(int argc, char** argv) {
             ImGui::SameLine();
             name_str_t mod_str = "";
             sprintf(mod_str, "(%s)", entry.mod->str_id);
-            ImGui::SetCursorPosX(ImGui::GetWindowContentRegionWidth() - ImGui::CalcTextSize(mod_str).x - ImGui::GetWindowContentRegionWidth() * .05f);
+            ImGui::SetCursorPosX(ImGui::GetWindowContentRegionWidth() - ImGui::CalcTextSize(mod_str).x - ImGui::GetWindowContentRegionWidth() * .01f);
             ImGui::TextDisabled("%s", mod_str);
 
             ImGui::Spacing();
@@ -1016,17 +1186,17 @@ int start(int argc, char** argv) {
 
             ImGui::Separator();
             if (selected_module) {
-                ImGui::Text("Module: %s", selected_module->str_id);
-                ImGui::Text("Has function '%s': %s", "on_load",         selected_module->on_load         ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "on_unload",       selected_module->on_unload       ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "on_update",       selected_module->on_update       ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "on_render",       selected_module->on_render       ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "on_gui",          selected_module->on_gui          ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "on_play_begin",   selected_module->on_play_begin   ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "on_play_stop",    selected_module->on_play_stop    ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "save_to_disk",    selected_module->save_to_disk    ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "load_from_disk",  selected_module->load_from_disk  ? "yes" : "no");
-                ImGui::Text("Has function '%s': %s", "get_function_library",        selected_module->get_function_library        ? "yes" : "no");
+                ImGui::RCheckboxReadonly("Module", selected_module->str_id);
+                ImGui::RCheckboxReadonly("Has function 'on_load'",selected_module->on_load != NULL);
+                ImGui::RCheckboxReadonly("Has function 'on_unload'", selected_module->on_unload != NULL);
+                ImGui::RCheckboxReadonly("Has function 'on_update'", selected_module->on_update != NULL);
+                ImGui::RCheckboxReadonly("Has function 'on_render'", selected_module->on_render != NULL);
+                ImGui::RCheckboxReadonly("Has function 'on_gui'", selected_module->on_gui != NULL);
+                ImGui::RCheckboxReadonly("Has function 'on_play_begin'", selected_module->on_play_begin != NULL);
+                ImGui::RCheckboxReadonly("Has function 'on_play_stop'", selected_module->on_play_stop != NULL);
+                ImGui::RCheckboxReadonly("Has function 'save_to_disk'", selected_module->save_to_disk != NULL);
+                ImGui::RCheckboxReadonly("Has function 'load_from_disk'", selected_module->load_from_disk != NULL);
+                ImGui::RCheckboxReadonly("Has function 'get_function_library'", selected_module->get_function_library != NULL);
 
                 if (selected_module->is_loaded) {
                     ImGui::Spacing();
@@ -1101,12 +1271,32 @@ int start(int argc, char** argv) {
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Windows")) {
-            for (auto* gui_wnd : gui_windows) {
-                ImGui::MenuItem(gui_wnd->name, NULL, &gui_wnd->open);
+        std::function<void(Window_Category_Node* n)> wnd_gui;
+        wnd_gui = [&](Window_Category_Node* n) {
+            if (ImGui::BeginMenu(n->name)) {
+                for (auto& c : n->child_nodes) {
+                    wnd_gui(&c);
+                }
+                for (auto gui_wnd : n->windows) {
+                    ImGui::MenuItem(gui_wnd->name, NULL, &gui_wnd->open);
+                }
+                if (n->child_nodes.size() > 0) {
+                    ImGui::Separator();
+                    ImGui::PushID(n);
+                    if (ImGui::BeginMenu("All")) {
+                        n->iterate([](Gui_Window* gui_wnd) {
+                            ImGui::MenuItem(gui_wnd->name, NULL, &gui_wnd->open);
+                            return true;
+                        });
+                        ImGui::EndMenu();
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndMenu();
             }
-            ImGui::EndMenu();
-        }
+        };
+
+        wnd_gui(g_windows);
 
         ImGui::Separator();
 
@@ -1169,6 +1359,14 @@ int start(int argc, char** argv) {
                         deselect_all_entities();
                     }
                     select_entity(entity);
+                }
+
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoDisableHover | ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+                    Gui_Payload payload;
+                    payload.value = (void*)(uintptr_t)entity;
+                    ImGui::SetDragDropPayload("entity", &payload, sizeof(Gui_Payload));
+                    ImGui::Text(g_reg.get<Entity_Info>(entity).name);
+                    ImGui::EndDragDropSource();
                 }
 
                 ImGui::PushID((int)entity);
@@ -1244,7 +1442,7 @@ int start(int argc, char** argv) {
                                 ImGui::SameLine();
                                 name_str_t mod_str = "";
                                 sprintf(mod_str, "(%s)", mod->str_id);
-                                ImGui::SetCursorPosX(ImGui::GetWindowContentRegionWidth() - ImGui::CalcTextSize(mod_str).x - ImGui::GetWindowContentRegionWidth() * .05f);
+                                ImGui::SetCursorPosX(ImGui::GetWindowContentRegionWidth() - ImGui::CalcTextSize(mod_str).x - ImGui::GetWindowContentRegionWidth() * .01f);
                                 ImGui::TextDisabled("%s", mod_str);
 
                                 mod->set_imgui_context(ImGui::GetCurrentContext());
@@ -1284,9 +1482,46 @@ int start(int argc, char** argv) {
             }
         });
 
-        ImGui::DoGuiWindow(&style_editor, []() {
+        ImGui::DoGuiWindow(&style_editor, [&]() {
             auto& style = ImGui::GetStyle();
             auto& ext_style = ImGui::GetExtensionStyle();
+
+            ImGui::BeginMenuBar();
+
+            if (ImGui::BeginMenu("Presets...")) {
+                path_str_t presets_dir = "";
+                sprintf(presets_dir, "%s/styles", essential_dir);
+                Path::iterate_directories(presets_dir, [](str_ptr_t entry) {
+                    if (!Path::is_file(entry)) return true;
+
+                    path_str_t file_name = "";
+
+                    Path::name_without_extension(entry, file_name);
+
+                    if (ImGui::MenuItem(file_name)) {
+                        ImGui::LoadStyleFromDisk(entry);
+                    }
+
+                    return true;
+                });
+                ImGui::EndMenu();
+            }
+
+            ImGui::EndMenuBar();
+
+            if (ImGui::RButton("Save to file")) {
+                open_file_browser(File_Browser_Mode::file, [](str_ptr_t result) {
+                    ImGui::SaveStyleToDisk(result);
+                });
+            }
+
+            if (ImGui::RButton("Load from file")) {
+                open_file_browser(File_Browser_Mode::file, [](str_ptr_t result) {
+                    ImGui::LoadStyleFromDisk(result);
+                });
+            }
+
+            ImGui::Separator();
 
             ImGui::Text("Padding");
             ImGui::RDragFloat2("Window padding", (float*)&style.WindowPadding, .05f);
@@ -1304,30 +1539,40 @@ int start(int argc, char** argv) {
             ImGui::Spacing();
             ImGui::Text("Border toggles");
             {
+                ImGui::PushID(&style.WindowBorderSize);
                 bool borders = style.WindowBorderSize > 0;
                 ImGui::RCheckbox("Window borders", &borders);
-                style.WindowBorderSize = (f32)borders;
+                style.WindowBorderSize = borders ? 1.f : 0.f;
+                ImGui::PopID();
             }
             {
+                ImGui::PushID(&style.ChildBorderSize);
                 bool borders = style.ChildBorderSize > 0;
                 ImGui::RCheckbox("Child borders", &borders);
-                style.ChildBorderSize = (f32)borders;
+                style.ChildBorderSize = borders ? 1.f : 0.f;
+                ImGui::PopID();
             }
             {
+                ImGui::PushID(&style.PopupBorderSize);
                 bool borders = style.PopupBorderSize > 0;
                 ImGui::RCheckbox("Popup borders", &borders);
-                style.PopupBorderSize = (f32)borders;
+                style.PopupBorderSize = borders ? 1.f : 0.f;
+                ImGui::PopID();
             }
             {
+                ImGui::PushID(&style.TabBorderSize);
                 bool borders = style.TabBorderSize > 0;
                 ImGui::RCheckbox("Tab borders", &borders);
-                style.TabBorderSize = (f32)borders;
+                style.TabBorderSize = borders ? 1.f : 0.f;
+                ImGui::PopID();
             }
 
             {
+                ImGui::PushID(&style.FrameBorderSize);
                 bool borders = style.FrameBorderSize > 0;
                 ImGui::RCheckbox("Frame borders", &borders);
-                style.FrameBorderSize = (f32)borders;
+                style.FrameBorderSize = borders ? 1.f : 0.f;
+                ImGui::PopID();
             }
 
             ImGui::Spacing();
@@ -1398,7 +1643,7 @@ int start(int argc, char** argv) {
             for (int i = 0; i < ImGuiCol_COUNT; i++) {
                 ImGui::RColorEdit4(ImGui::GetStyleColorName(i), (float*)&style.Colors[i]);
             } 
-        });
+        }, ImGuiWindowFlags_MenuBar);
 
         for (auto* popup : gui_popups) {
             if (popup->should_open) {
@@ -1465,6 +1710,8 @@ int start(int argc, char** argv) {
         }
         g_entities_to_remove.clear();
     }
+
+    delete g_windows;
 
     shutdown_dependencies();
 

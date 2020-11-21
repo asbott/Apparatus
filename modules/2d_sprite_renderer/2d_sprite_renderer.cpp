@@ -134,7 +134,7 @@ void submit(Graphics_Context* graphics, fmat4 transform, fvec2 origin, color16 t
 
 
 	// bottom left
-	context.data_ptr->pos = transform.get_translation();
+	context.data_ptr->pos = (fvec3)(ivec3)transform.get_translation();
 	context.data_ptr->color = tint;
 	context.data_ptr->uv = uvs[0];
 	context.data_ptr->texture_index = (f32)texture_index;
@@ -145,7 +145,7 @@ void submit(Graphics_Context* graphics, fmat4 transform, fvec2 origin, color16 t
 	transform.translate(offset_translation);
 
 	// bottom right
-	context.data_ptr->pos = transform.get_translation();
+	context.data_ptr->pos = (fvec3)(ivec3)transform.get_translation();
 	context.data_ptr->color = tint;
 	context.data_ptr->uv = uvs[1];
 	context.data_ptr->texture_index = (f32)texture_index;
@@ -156,7 +156,7 @@ void submit(Graphics_Context* graphics, fmat4 transform, fvec2 origin, color16 t
 	transform.translate(offset_translation);
 
 	// top right
-	context.data_ptr->pos = transform.get_translation();
+	context.data_ptr->pos = (fvec3)(ivec3)transform.get_translation();
 	context.data_ptr->color = tint;
 	context.data_ptr->uv = uvs[2];
 	context.data_ptr->texture_index = (f32)texture_index;
@@ -167,7 +167,7 @@ void submit(Graphics_Context* graphics, fmat4 transform, fvec2 origin, color16 t
 	transform.translate(offset_translation);
 
 	// top left
-	context.data_ptr->pos = transform.get_translation();
+	context.data_ptr->pos = (fvec3)(ivec3)transform.get_translation();
 	context.data_ptr->color = tint;
 	context.data_ptr->uv = uvs[3];
 	context.data_ptr->texture_index = (f32)texture_index;
@@ -217,6 +217,7 @@ void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& 
 
 	{
 		// Submit sprite animations
+
 		reg.sort<SpriteAnimation2D>([](const SpriteAnimation2D& lhs, const SpriteAnimation2D& rhs) {
 			return lhs.depth_level < rhs.depth_level;
 		});
@@ -234,6 +235,11 @@ void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& 
 				if (!sprite_anim.get_sheet_data(&sheet_data)) {
 					continue;
 				}
+
+				if (!functions->validate(&sheet_data.texture)) {
+					continue;
+				}
+
 				Asset* texture_asset = functions->begin_use(sheet_data.texture);
 				if (!texture_asset) {
 					continue;
@@ -243,32 +249,36 @@ void render_sprites(Graphics_Context* graphics, const fmat4& view, const fmat4& 
 				
 				uvec2 ncells = (texture_data.size / sheet_data.cell_size);
 
-				u32 xindex = (sprite_anim.target_frames.min + sprite_anim.current_frame) % ncells.width;
-				u32 yindex = (sprite_anim.target_frames.min + sprite_anim.current_frame) / ncells.width;
-				fvec2 offset(xindex * sheet_data.cell_size.width, yindex * sheet_data.cell_size.height);
+				if (ncells.x > 0 && ncells.y > 0) {
+					if (sprite_anim.current_frame > sprite_anim.target_frames.max - sprite_anim.target_frames.min) 
+						sprite_anim.current_frame = 0;
+					u32 xindex = (sprite_anim.target_frames.min + sprite_anim.current_frame) % ncells.width;
+					u32 yindex = (sprite_anim.target_frames.min + sprite_anim.current_frame) / ncells.width;
+					fvec2 offset(xindex * sheet_data.cell_size.width, yindex * sheet_data.cell_size.height);
 
 
-				f32 left = offset.x / texture_data.size.width;
-				f32 right = (offset.x + sheet_data.cell_size.width) / texture_data.size.width;
-				f32 bottom = offset.y / texture_data.size.height;
-				f32 top = (offset.y + sheet_data.cell_size.height) / texture_data.size.height;
-				fvec2 uvs[4] = {
-					{left, top }, { right, top }, { right, bottom }, { left, bottom }
-				};
-				if (sprite_anim.xflip) {
-					f32 temp = uvs[0].x;
-					uvs[0].x = uvs[1].x;
-					uvs[1].x = temp;
-					temp = uvs[2].x;
-					uvs[2].x = uvs[3].x;
-					uvs[3].x = temp;
+					f32 left = offset.x / texture_data.size.width;
+					f32 right = (offset.x + sheet_data.cell_size.width) / texture_data.size.width;
+					f32 bottom = offset.y / texture_data.size.height;
+					f32 top = (offset.y + sheet_data.cell_size.height) / texture_data.size.height;
+					fvec2 uvs[4] = {
+						{left, top }, { right, top }, { right, bottom }, { left, bottom }
+					};
+					if (sprite_anim.xflip) {
+						f32 temp = uvs[0].x;
+						uvs[0].x = uvs[1].x;
+						uvs[1].x = temp;
+						temp = uvs[2].x;
+						uvs[2].x = uvs[3].x;
+						uvs[3].x = temp;
+					}
+					fmat4 transform_matrix = mz::transformation::translation<f32>(transform.position);
+					transform_matrix.rotate(transform.rotation, { 0, 0, -1 });
+					transform_matrix.scale(transform.scale - fvec2(1));
+					transform_matrix.translate(-sprite_anim.origin);
+					transform_matrix.scale(fvec2(right - left, top - bottom) - fvec2(1));
+					submit(graphics, transform_matrix, fvec2(0), sprite_anim.tint, sheet_data.texture, used_textures, vertex_count, index_count, uvs, render_target, context);
 				}
-				fmat4 transform_matrix = mz::transformation::translation<f32>(transform.position);
-				transform_matrix.rotate(transform.rotation, { 0, 0, -1 });
-				transform_matrix.scale(transform.scale - fvec2(1));
-				transform_matrix.translate(-sprite_anim.origin);
-				transform_matrix.scale(fvec2(right - left, top - bottom) - fvec2(1));
-				submit(graphics, transform_matrix, fvec2(0), sprite_anim.tint, sheet_data.texture, used_textures, vertex_count, index_count, uvs, render_target, context);
 
 				functions->end_use(sheet_data.texture);
 			}
@@ -407,8 +417,6 @@ module_scope {
 	}
 
 	module_function(void) on_update(float delta) {
-		(void)delta;
-
 		auto& reg = get_entity_registry();
 
 		auto view = reg.view<SpriteAnimation2D>();
@@ -417,7 +425,7 @@ module_scope {
 				anim.time = 0;
 			}
 
-			anim.time += delta;
+			if (anim.is_playing) anim.time += delta;
 
 			if (anim.time >= 1.f / anim.frames_per_second) {
 				anim.time -= 1.f / anim.frames_per_second;

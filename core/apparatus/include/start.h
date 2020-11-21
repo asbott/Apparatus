@@ -17,13 +17,19 @@ enum Icon_Type : u8 {
 	ICON_TYPE_COUNT
 };
 
+enum Property_Flag : s32 {
+	PROPERTY_FLAG_NONE = 0,
+	PROPERTY_FLAG_ENTITY = 1 << 0,
+};
+
 typedef str_t<256> entity_name_t;
 typedef str_t<128> comp_name_t;
 
-	constexpr u32 MAX_COMPONENTS_PER_ENTITY = 256;
+constexpr u32 MAX_COMPONENTS_PER_ENTITY = 256;
 
 struct Property_Info {
 	std::function<void(void*)> on_gui;
+	Property_Flag flags = PROPERTY_FLAG_NONE;
 
 	std::string name;
 	size_t size;
@@ -73,14 +79,14 @@ struct Game_Input {
 };
 
 struct Gui_Window {
-	Gui_Window(bool open, str_ptr_t _name, str_ptr_t _tree_path = "Windows") : open(open) {
+	Gui_Window(bool open, str_ptr_t _name, str_ptr_t _category = "") : open(open) {
 		strcpy(name, _name);
-		strcpy(tree_path, _tree_path);
+		strcpy(category, _category);
 	}
 	bool open;
 	bool focused = false;
 	name_str_t name;
-	path_str_t tree_path = "Windows";
+	path_str_t category = "";
 };
 
 struct Gui_Popup {
@@ -113,6 +119,8 @@ namespace ImGui {
 
 	AP_API void Icon(Icon_Type icon, mz::ivec2 size);
 	AP_API bool IconButton(Icon_Type icon, mz::ivec2 size, const mz::color& bgr_color = 0, bool border = false);
+
+	AP_API bool InputEntity(str_ptr_t label, entt::entity* entity);
 }
 
 enum class File_Browser_Mode {

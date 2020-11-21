@@ -125,6 +125,8 @@ void on_gui(void* parameter) {
             u32 yindex = (u32)((yoffset / height) * ncells.height);
             u32 mouse_index = yindex * ncells.x + xindex;
 
+            // TODO: #Refactor
+
             for (u32 nx = 0; nx < ncells.width; nx++) {
                 for (u32 ny = 0; ny < ncells.height; ny++) {
                     f32 x = (f32)nx * sheet_data->cell_size.width;

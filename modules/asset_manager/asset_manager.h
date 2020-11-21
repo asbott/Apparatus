@@ -105,7 +105,7 @@ namespace ImGui {
 		auto* asset_functions = (Asset_Manager_Function_Library*)asset_mod->get_function_library();
 		Asset* asset_view = asset_functions->view(*aid);
 		static char na[] = "<none>";
-		if (asset_view) ImGui::RInputText(label, asset_view->file_name, strlen(asset_view->file_name));
+		if (asset_view) ImGui::RInputText(label, asset_view->file_name, sizeof(asset_view->file_name), ImGuiInputTextFlags_ReadOnly);
 		else ImGui::RInputText(label, na, sizeof(na), ImGuiInputTextFlags_ReadOnly);
 		if (ImGui::BeginDragDropTarget()) {
 			auto* p = ImGui::AcceptDragDropPayload("asset");
@@ -125,6 +125,7 @@ namespace ImGui {
 			ImGui::SameLine();
 			if (ImGui::Button("X")) {
 				*aid = NULL_ASSET_ID;
+				return true;
 			}
 		}
 

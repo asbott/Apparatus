@@ -48,6 +48,7 @@ namespace ImGui {
     AP_API bool RSliderInt4(const char* label, int v[4], int v_min, int v_max, const char* format = "%d", ImGuiSliderFlags flags = 0);
 
     AP_API bool RCheckbox(const char* label, bool* v);
+    AP_API void RCheckboxReadonly(const char* label, bool v);
 
     AP_API bool RBeginCombo(const char* label, const char* preview_value, ImGuiComboFlags flags = 0);
     AP_API void REndCombo();
@@ -65,6 +66,7 @@ namespace ImGui {
 
     AP_API void SaveStyleToDisk(str_ptr_t path);
     AP_API void LoadStyleFromDisk(str_ptr_t path);
+
 
     namespace Filters {
         AP_API int AlphaNumericNoSpace(ImGuiTextEditCallbackData* data);
