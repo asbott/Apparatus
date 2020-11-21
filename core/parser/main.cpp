@@ -507,10 +507,17 @@ void do_gui(const std::string& name, type_t* data) {
     }
 }
 
+Module* g_self = NULL;
+
+Module* get_self() {
+    return g_self;
+}
+
 module_scope {
 
     // Generated
-	module_function(void) init() {
+	module_function(void) init(Module* self) {
+    g_self = self;
 
 )"; constexpr char lower_code[] = R"(
     

@@ -9,10 +9,20 @@ put any work in at all soon as it seems that I'm going to have to sell my laptop
 to pay the rent. Feel free to contribute while I'm gone, I'll have a crappy laptop
 to at least check in on the repo.
 
+# Philosophy
+## Customize everything
+Everything should be customizable to the liking of the user! Be that from the color of buttons to the colors of error messages and the size of input fields.
+## Modular & Extensible
+Everything is divided into modules (shared libraries). The idea is that these should be completely removable. If you don't want a renderer for your game you could just unload it (and probably replace it with your own). In general, things are designed to be extensible. For example, anyone can create a new asset by registering an asset loader in the asset manager module.
+## Runtime C++ compiling (+ language extension)
+With dynamically loaded modules we can rebuild a module in runtime and then do a hot reload. This means that we can compile C++ code in runtime. No scripting whatsover - just native C++ code. When building a module there's a parser which goes through the header files for some introspection. This means that there's some simple language extension for creating components and the like in runtime.
+## No hidden data
+There cannot be full modularity if all data is hidden. Everything in the engine is in some way accessible to everything. This does of course mean that's it's very easy to break everything, which is why proper documentation is a must. The engine WILL crash at several occasions, but it will also be designed with this in mind.
+## Portability
+The goal is to support all platforms and the code is design to do so. However at the moment Apparatus really only builds on Windows and most Linux distributions on x64 systems.
+
 # Plan
-I got tired of keeping long physical lists of TODO's, so I created a trello board
-to just dump everything I can think of in there so I don't forget about it and
-always have something to do. The board can be found <a href="https://trello.com/b/xe6pIKCK/apparatus">here</a>.
+A trello board can be found <a href="https://trello.com/b/xe6pIKCK/apparatus">here</a>.
 
 # Building
 
@@ -39,27 +49,20 @@ always have something to do. The board can be found <a href="https://trello.com/
 Apparatus should be fully functional on Linux systems using x11. Has been tested with Manjaro 20.1.2, compiling with g++ 10.2.0.
 
 # Showcase
-(These gifs are of a very outdated version1)
+As of 21-11-2020
 
-Runtime management of entites/components (entt backend)
-![](repo/entitiescomponents.gif)
+## Runtime 2D editor
+![](repo/editor.gif)
 
-Asset management and dnd
-![](repo/assetmanagement.gif)
+## Full customizability
+![](repo/customize.gif)
 
-Editor viewport & interactions (click to select, drag, multiselect)
-![](repo/editorinteraction.gif)
+## Ecs (entt)
+![](repo/ecs.gif)
 
-2D physics (box2d backend)
+## 2D physics (box2d)
 ![](repo/2dphysics.gif)
+ 
+## Sprite sheet animation
+![](repo/2dsheetanim.gif)
 
-Multiple cameras
-![](repo/multiplecameras.gif)
-
-Runtime c++ compiling (hot reloading modules), language extension & introspection. Say no to scripting. Just pure C++ code.
-![](repo/runtimecpp.gif)
-
-Entt api for gameplay programming in modules
-![](repo/runtimecppentt.gif)
-
-Moreover, everything is pretty much fully modular with the runtime module system so it's very easy to extend and add or customize features. For example, if you don't like the default renderer you can replace it with your own DLL, as long as it is a valid apparatus module and use the same .h file.

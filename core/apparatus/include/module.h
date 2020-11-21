@@ -23,7 +23,7 @@ struct Module {
     typedef void (__cdecl *save_to_disk_t)  (str_ptr_t);
     typedef void (__cdecl *load_from_disk_t)(str_ptr_t);
 
-    typedef void (__cdecl *init_t)(); 
+    typedef void (__cdecl *init_t)(Module*); 
     typedef void (__cdecl *deinit_t)(); 
     typedef Component_Info* (__cdecl *get_component_info_t)(uintptr_t); 
     typedef const Hash_Set<uintptr_t>& (__cdecl *get_component_ids_t)(); 

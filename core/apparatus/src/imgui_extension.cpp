@@ -172,11 +172,10 @@ namespace ImGui {
         if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", label);
         }
-        auto wnd = ImGui::GetCurrentWindow();
-        if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
-            SameLine();
-        } else {
+        if (can_align_to_right()) {            
             SameLine(right_offset - ImGui::GetStyle().ItemSpacing.x * 2.f);
+        } else {
+            SameLine();
         }
         f32 item_width = GetWindowWidth() - right_offset - GetWindowWidth() * g_ext_style.right_align_padding;
         f32 labelx_width = ImGui::CalcTextSize("X").x;
@@ -205,11 +204,10 @@ namespace ImGui {
         if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", label);
         }
-        auto wnd = ImGui::GetCurrentWindow();
-        if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
-            SameLine();
-        } else {
+        if (can_align_to_right()) {            
             SameLine(right_offset - ImGui::GetStyle().ItemSpacing.x * 3.f);
+        } else {
+            SameLine();
         }
         f32 item_width = GetWindowWidth() - right_offset - GetWindowWidth() * g_ext_style.right_align_padding;
         f32 labelx_width = ImGui::CalcTextSize("X").x;
@@ -244,11 +242,10 @@ namespace ImGui {
         if (ImGui::IsKeyDown(AP_KEY_LEFT_CONTROL) && ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", label);
         }
-        auto wnd = ImGui::GetCurrentWindow();
-        if ((wnd->Flags & ImGuiWindowFlags_Popup) != 0 || wnd->MenuBarHeight() > 0) {
-            SameLine();
-        } else {
+        if (can_align_to_right()) {            
             SameLine(right_offset - ImGui::GetStyle().ItemSpacing.x * 4.f);
+        } else {
+            SameLine();
         }
         f32 item_width = GetWindowWidth() - right_offset - GetWindowWidth() * g_ext_style.right_align_padding;
         f32 labelx_width = ImGui::CalcTextSize("X").x;

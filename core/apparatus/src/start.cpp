@@ -389,7 +389,9 @@ void to_file(entt::registry& reg, str_ptr_t dir_path) {
                     byte* comp = (byte*) mod->get_component(comp_id, reg, entity);
                     if (prop.flags & PROPERTY_FLAG_ENTITY) {
                         entt::entity prop_entity = *(entt::entity*)(comp + prop.offset);
-                        comp_archive.write<entity_name_t>(prop_name, g_reg.get<Entity_Info>(prop_entity).name);
+                        if (g_reg.valid(prop_entity)) {
+                            comp_archive.write<entity_name_t>(prop_name, g_reg.get<Entity_Info>(prop_entity).name);
+                        }
                     } else {
                         comp_archive.write(prop_name, comp + prop.offset, prop.size);
                     }
@@ -789,7 +791,7 @@ void do_file_browser_gui() {
 bool load_module(Module* mod) {
     if (!mod->load()) return false;
     ap_assert(mod->init, "Init function missing in module '{}'", mod->str_id);
-    mod->init();
+    mod->init(mod);
 
     invoke_mod_function(mod, on_load, void);
     for (auto& deferred_fn : g_deferred_functions) deferred_fn();
@@ -1524,17 +1526,17 @@ int start(int argc, char** argv) {
             ImGui::Separator();
 
             ImGui::Text("Padding");
-            ImGui::RDragFvec2("Window padding", &(fvec2)style.WindowPadding, .05f);
-            ImGui::RDragFvec2("Frame padding", &(fvec2)style.FramePadding, .05f);
-            ImGui::RDragFvec2("Touch extra padding", &(fvec2)style.TouchExtraPadding, .05f);
-            ImGui::RDragFvec2("Display window padding", &(fvec2)style.DisplayWindowPadding, .05f);
-            ImGui::RDragFvec2("Display safe area padding", &(fvec2)style.DisplaySafeAreaPadding, .05f);
-            ImGui::RDragFvec2("Item padding", &(fvec2)style.ItemSpacing, .05f);
-            ImGui::RDragFvec2("Item inner padding", &(fvec2)style.ItemInnerSpacing, .05f);
+            ImGui::RDragFvec2("Window padding", (fvec2*)&style.WindowPadding, .05f);
+            ImGui::RDragFvec2("Frame padding", (fvec2*)&style.FramePadding, .05f);
+            ImGui::RDragFvec2("Touch extra padding", (fvec2*)&style.TouchExtraPadding, .05f);
+            ImGui::RDragFvec2("Display window padding", (fvec2*)&style.DisplayWindowPadding, .05f);
+            ImGui::RDragFvec2("Display safe area padding", (fvec2*)&style.DisplaySafeAreaPadding, .05f);
+            ImGui::RDragFvec2("Item padding", (fvec2*)&style.ItemSpacing, .05f);
+            ImGui::RDragFvec2("Item inner padding", (fvec2*)&style.ItemInnerSpacing, .05f);
             ImGui::RDragFloat("Indent padding", &style.IndentSpacing, .05f);
             ImGui::RDragFloat("Columns min padding", &style.ColumnsMinSpacing, .05f);
             ImGui::RSliderFloat("Right align padding", &ext_style.right_align_padding, .01f, 1.f);
-            ImGui::RDragFvec2("Button min padding", &(fvec2)ext_style.min_button_padding, .05f);
+            ImGui::RDragFvec2("Button min padding", (fvec2*)&ext_style.min_button_padding, .05f);
 
             ImGui::Spacing();
             ImGui::Text("Border toggles");

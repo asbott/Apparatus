@@ -28,3 +28,6 @@ using namespace mz;
 #define tag(...) 
 
 typedef entt::entity entity_t;
+
+// Implemented in modules _generated.cpp
+extern Module* get_self();

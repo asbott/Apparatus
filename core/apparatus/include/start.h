@@ -78,6 +78,8 @@ struct Game_Input {
 	mz::fvec2 mouse_world_pos;
 };
 
+
+
 struct Gui_Window {
 	Gui_Window(bool open, str_ptr_t _name, str_ptr_t _category = "") : open(open) {
 		strcpy(name, _name);

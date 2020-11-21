@@ -49,10 +49,10 @@ std::shared_ptr<spdlog::logger> AP_API _get_spdlogger();
 	#define log_critical(...)	{ SPDLOG_LOGGER_CALL(_get_spdlogger(), spdlog::level::critical, __VA_ARGS__); }
 
 #else
-    #define log_trace(...)
-	#define log_debug(...)
-	#define log_info(...)
-	#define log_warn(...)
-	#define log_error(...)
+    #define log_trace(...) (void)0
+	#define log_debug(...) (void)0
+	#define log_info(...) (void)0
+	#define log_warn(...) (void)0
+	#define log_error(...) (void)0
 	#define log_critical(...)	{ SPDLOG_LOGGER_CALL(_get_spdlogger(), spdlog::level::critical, __VA_ARGS__); }
 #endif

@@ -33,18 +33,25 @@ void do_gui(const std::string& name, type_t* data) {
     } else if constexpr (std::is_same<type_t, mz::fvec2>()) {
         ImGui::RDragFvec2(label.c_str(), data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec3>()) {
-        ImGui::RDragFloat3(label.c_str(), (f32*)data, 0.1f);
+        ImGui::RDragFvec3(label.c_str(), data, 0.1f);
     } else if constexpr (std::is_same<type_t, mz::fvec4>()) {
-        ImGui::RDragFloat4(label.c_str(), (f32*)data, 0.1f);
+        ImGui::RDragFvec4(label.c_str(), data, 0.1f);
     } else {
         ImGui::Text("%s N/A", label.c_str());
     }
 }
 
+Module* g_self = NULL;
+
+Module* get_self() {
+    return g_self;
+}
+
 module_scope {
 
     // Generated
-	module_function(void) init() {
+	module_function(void) init(Module* self) {
+    g_self = self;
 
 
     
